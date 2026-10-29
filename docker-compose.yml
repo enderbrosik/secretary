@@ -1,0 +1,26 @@
+# Self-hosted deployment. Put a TLS-terminating reverse proxy (Caddy, nginx, a cloud LB) in front.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: secretary
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: secretary
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U secretary']
+      interval: 5s
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://secretary:${POSTGRES_PASSWORD}@db:5432/secretary
+      TRUST_PROXY: 'true'
+      COOKIE_SECURE: 'true'
+    ports: ['127.0.0.1:8787:8787']
+volumes:
+  pgdata:

@@ -4,7 +4,7 @@
 //  3. copies the current Node.js executable to src-tauri/binaries/node-<target-triple>.
 // Run on each target OS (CI does this per platform) so the Node binary matches the target.
 import { execFileSync, execSync } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,11 +18,7 @@ const out = path.join(tauriDir, 'resources/server');
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 cpSync(path.join(root, 'apps/server/dist'), out, { recursive: true });
-writeFileSync(path.join(out, 'package.json'), JSON.stringify({ type: 'module', private: true }));
-
-// PGlite ships WASM + data files resolved relative to its own module, so copy the package as-is.
-const pgliteDir = realpathSync(path.join(root, 'packages/db/node_modules/@electric-sql/pglite'));
-cpSync(pgliteDir, path.join(out, 'node_modules/@electric-sql/pglite'), { recursive: true, dereference: true });
+// (the server build already places PGlite and package.json inside dist/)
 
 const triple = execFileSync('rustc', ['--print', 'host-tuple']).toString().trim() || execFileSync('rustc', ['-vV']).toString().match(/host: (.+)/)[1];
 const binDir = path.join(tauriDir, 'binaries');

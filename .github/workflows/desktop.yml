@@ -1,0 +1,63 @@
+name: Desktop builds
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest       # Apple Silicon
+            args: --target aarch64-apple-darwin
+            rust_target: aarch64-apple-darwin
+          - os: macos-13           # Intel
+            args: --target x86_64-apple-darwin
+            rust_target: x86_64-apple-darwin
+          - os: windows-latest
+            args: ''
+            rust_target: x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            args: ''
+            rust_target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: '${{ matrix.rust_target }}' }
+      - uses: swatinem/rust-cache@v2
+        with: { workspaces: apps/desktop/src-tauri }
+      - name: Linux system dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @secretary/web build
+      # The sidecar copies the runner's own Node.js binary, so each runner bundles a native one.
+      - run: node apps/desktop/scripts/prepare-sidecar.mjs
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Updater signing (optional): generate with `pnpm tauri signer generate`.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_UPDATER_PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+          TAURI_UPDATER_ENDPOINT: ${{ vars.TAURI_UPDATER_ENDPOINT }}
+          # macOS signing & notarization (optional; unsigned builds still run after a Gatekeeper prompt).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: Secretary ${{ github.ref_name }}
+          releaseDraft: true

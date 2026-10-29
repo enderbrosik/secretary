@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { cpSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -22,4 +22,7 @@ await build({
   logLevel: 'info',
 });
 cpSync(path.join(here, '../../packages/db/migrations'), path.join(out, 'migrations'), { recursive: true });
-console.log('Server bundle written to dist/');
+// Make dist/ self-contained: PGlite (WASM + data files) next to the bundle, ESM package marker.
+cpSync(realpathSync(path.join(here, '../../packages/db/node_modules/@electric-sql/pglite')), path.join(out, 'node_modules/@electric-sql/pglite'), { recursive: true, dereference: true });
+writeFileSync(path.join(out, 'package.json'), JSON.stringify({ type: 'module', private: true }));
+console.log('Server bundle written to dist/ (self-contained: node dist/main.mjs)');

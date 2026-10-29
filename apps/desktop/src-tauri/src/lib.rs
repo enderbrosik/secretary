@@ -235,7 +235,7 @@ pub fn run() {
             if config.mode == "local" {
                 let node = std::env::current_exe()?.parent().map(|p| p.join(if cfg!(windows) { "secretary-node.exe" } else { "secretary-node" })).unwrap();
                 let server_dir = app.path().resource_dir()?.join("server");
-                match sidecar::start(node, server_dir, data_dir.join("local"), &state.secrets) {
+                match sidecar::start(node, server_dir, data_dir.join("local"), Some(config_dir.join("server.env")), &state.secrets) {
                     Ok(srv) => *state.local.lock().unwrap() = Some(srv),
                     Err(e) => *state.local_error.lock().unwrap() = Some(e),
                 }

@@ -13,3 +13,4 @@ apps/desktop/src-tauri/resources/server/
 test-results/
 playwright-report/
 .DS_Store
+release/

@@ -14,5 +14,5 @@ export default defineConfig({
     proxy: { '/api': { target: api, changeOrigin: false } },
   },
   build: { target: 'es2022', outDir: 'dist', sourcemap: true, chunkSizeWarningLimit: 900 },
-  test: { environment: 'jsdom' },
+  test: { environment: 'jsdom', include: ['src/**/*.test.ts'] },
 });

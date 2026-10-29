@@ -25,7 +25,14 @@ impl Drop for LocalServer {
     }
 }
 
+/// Preferred fixed port, so OAuth redirect URIs (http://127.0.0.1:47821/api/integrations/callback/…)
+/// can be registered once. Falls back to a random free port if it is taken.
+pub const PREFERRED_PORT: u16 = 47821;
+
 fn free_port() -> std::io::Result<u16> {
+    if TcpListener::bind(("127.0.0.1", PREFERRED_PORT)).is_ok() {
+        return Ok(PREFERRED_PORT);
+    }
     Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.port())
 }
 
@@ -40,12 +47,26 @@ fn master_key(store: &SecretStore) -> Result<String, String> {
     Ok(k)
 }
 
-pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, store: &SecretStore) -> Result<LocalServer, String> {
+pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, extra_env: Option<PathBuf>, store: &SecretStore) -> Result<LocalServer, String> {
     let port = free_port().map_err(|e| e.to_string())?;
     let url = format!("http://127.0.0.1:{port}");
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     let db = data_dir.join("db");
-    let mut child = Command::new(node_bin)
+    let mut cmd = Command::new(node_bin);
+    // Optional OAuth app credentials for local mode (KEY=VALUE lines); core settings below always win.
+    if let Some(path) = extra_env {
+        if let Ok(text) = std::fs::read_to_string(path) {
+            for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+                if let Some((k, v)) = line.split_once('=') {
+                    let k = k.trim();
+                    if k.ends_with("_CLIENT_ID") || k.ends_with("_CLIENT_SECRET") || k == "MICROSOFT_TENANT" {
+                        cmd.env(k, v.trim());
+                    }
+                }
+            }
+        }
+    }
+    let mut child = cmd
         .arg(server_dir.join("main.mjs"))
         .current_dir(&server_dir)
         .env("NODE_ENV", "production")
