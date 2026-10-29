@@ -13,7 +13,7 @@ const schema = z.object({
   /** Public base URL of the API (used for OAuth redirect URIs). */
   PUBLIC_URL: z.string().url().default('http://localhost:8787'),
   /** Comma-separated allowed browser origins (web app, desktop webview). */
-  WEB_ORIGINS: z.string().default('http://localhost:5173,tauri://localhost,http://tauri.localhost,https://tauri.localhost'),
+  WEB_ORIGINS: z.string().default('http://localhost:5173,http://127.0.0.1:5173,tauri://localhost,http://tauri.localhost,https://tauri.localhost'),
   /** URL the OAuth callback redirects the browser back to. */
   APP_URL: z.string().url().default('http://localhost:5173'),
   DATABASE_URL: z.string().min(1).default('postgres://secretary:secretary@localhost:5432/secretary'),

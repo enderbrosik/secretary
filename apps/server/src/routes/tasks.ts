@@ -98,11 +98,17 @@ export async function taskRoutes(app: FastifyInstance, deps: Deps) {
 
   app.post('/api/tasks', async (req, reply) => {
     const user = requireUser(req);
-    const body = parse(taskInputSchema, req.body);
+    const body = parse(taskInputSchema.extend({ sourceItemId: z.string().uuid().nullable().default(null) }), req.body);
     await assertOwnRefs(user.id, body.projectId, body.dependsOn);
+    let sourceUrl: string | null = null;
+    if (body.sourceItemId) {
+      const [it] = await deps.db.select().from(schema.items).where(and(eq(schema.items.id, body.sourceItemId), eq(schema.items.userId, user.id)));
+      if (!it) throw badRequest('Unknown source item');
+      sourceUrl = it.url;
+    }
     const [t] = await deps.db
       .insert(schema.tasks)
-      .values({ ...body, userId: user.id, origin: 'user', confirmed: true, source: 'internal', completedAt: body.status === 'done' ? deps.now().toISOString() : null })
+      .values({ ...body, sourceUrl, userId: user.id, origin: 'user', confirmed: true, source: 'internal', completedAt: body.status === 'done' ? deps.now().toISOString() : null })
       .returning();
     await deps.db.insert(schema.taskEvents).values({ userId: user.id, taskId: t!.id, type: 'created' });
     return reply.code(201).send(taskDto(t!));

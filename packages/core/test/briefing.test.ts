@@ -144,3 +144,13 @@ describe('AI output validation', () => {
     expect(user).not.toContain('<system>');
   });
 });
+
+describe('email urgency', () => {
+  it('does not treat an incidental "today" as urgent', async () => {
+    const { emailSignals } = await import('../src/index.js');
+    const at = '2026-10-29T11:00:00Z';
+    expect(emailSignals(email("Sharing the pilot results ahead of today's sync. Can you take a look?", at), now).category).toBe('needs_reply');
+    expect(emailSignals(email('Need your sign-off by today please', at), now).category).toBe('urgent');
+    expect(emailSignals(email('Finance needs the final figures today', at), now).category).toBe('urgent');
+  });
+});

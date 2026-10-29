@@ -18,7 +18,8 @@ export const EMAIL_CATEGORY_LABELS: Record<EmailCategory, string> = {
   can_wait: 'Can probably wait',
 };
 
-const URGENT_RE = /\b(urgent|asap|as soon as possible|immediately|eod|end of (the )?day|by today|today)\b/i;
+// A bare "today" is not urgency ("ahead of today's sync"); it must be tied to a deadline or request.
+const URGENT_RE = /\b(urgent|asap|as soon as possible|immediately|eod|end of (the )?day|(by|before|until) (the end of )?today|today at the latest|(needs?|need it|due) (\w+ ){0,3}today)\b/i;
 const REQUEST_RE =
   /\?|\b(can you|could you|would you|please|let me know|thoughts|approve|approval|review|sign|confirm|feedback|need (you|your))\b/i;
 const WAITING_RE = /\b(waiting (on|for) you|following up|follow(ing)?-up|gentle reminder|reminder|any update|still need)\b/i;
