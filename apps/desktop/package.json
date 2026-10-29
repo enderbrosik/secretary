@@ -1,0 +1,16 @@
+{
+  "name": "@secretary/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "prepare:sidecar": "node scripts/prepare-sidecar.mjs",
+    "build:all": "pnpm --filter @secretary/web build && node scripts/prepare-sidecar.mjs && tauri build",
+    "typecheck": "echo 'desktop: checked by cargo'",
+    "test": "echo 'desktop: run cargo test in src-tauri'"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4"
+  }
+}

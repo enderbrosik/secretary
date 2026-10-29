@@ -16,8 +16,8 @@ await build({
   target: 'node22',
   format: 'esm',
   sourcemap: true,
-  // Native / asset-carrying packages stay external and are installed next to the bundle.
-  external: ['pg', 'pg-native', '@electric-sql/pglite'],
+  // PGlite carries WASM/data files resolved from its own folder, so it stays external and is copied next to the bundle.
+  external: ['pg-native', '@electric-sql/pglite'],
   banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
   logLevel: 'info',
 });
