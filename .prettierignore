@@ -1,0 +1,4 @@
+pnpm-lock.yaml
+packages/db/migrations
+apps/desktop/src-tauri/target
+dist

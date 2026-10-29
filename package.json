@@ -1,0 +1,25 @@
+{
+  "name": "secretary",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @secretary/server --filter @secretary/web dev",
+    "build": "pnpm --filter @secretary/web build && pnpm --filter @secretary/server build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --workspace-concurrency=1 test",
+    "test:live": "pnpm --filter @secretary/server test:live",
+    "e2e": "pnpm --filter @secretary/web e2e",
+    "db:generate": "pnpm --filter @secretary/db generate",
+    "db:migrate": "pnpm --filter @secretary/server migrate",
+    "format": "prettier --write .",
+    "desktop:dev": "pnpm --filter @secretary/desktop tauri dev",
+    "desktop:build": "pnpm --filter @secretary/desktop build:all"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.3"
+  }
+}
