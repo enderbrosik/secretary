@@ -60,7 +60,12 @@ export const settingsSchema = z.object({
   onboardingCompleted: z.boolean(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
-export const settingsPatchSchema = settingsSchema.partial();
+/** Partial update; nested groups can also be patched partially (e.g. just `automations.paused`). */
+export const settingsPatchSchema = settingsSchema.partial().extend({
+  notifications: notificationPrefsSchema.partial().optional(),
+  automations: automationsSchema.partial().optional(),
+});
+export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
 export const taskInputSchema = z.object({
   title: z.string().trim().min(1).max(300),
