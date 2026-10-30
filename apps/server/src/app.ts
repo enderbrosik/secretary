@@ -18,6 +18,8 @@ import { dailyRoutes } from './routes/daily.js';
 import { integrationRoutes } from './routes/integrations.js';
 import { systemRoutes } from './routes/system.js';
 import { taskRoutes } from './routes/tasks.js';
+import { localAIRoutes } from './routes/local-ai.js';
+import { setOllamaUrl } from './services/ai.js';
 
 export interface BuildOptions {
   config: Config;
@@ -109,7 +111,9 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
   });
 
   await authRoutes(app, deps);
+  setOllamaUrl(config.OLLAMA_URL);
   await aiRoutes(app, deps);
+  await localAIRoutes(app, deps);
   await integrationRoutes(app, deps);
   await taskRoutes(app, deps);
   await dailyRoutes(app, deps);

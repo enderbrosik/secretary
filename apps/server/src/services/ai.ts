@@ -7,7 +7,13 @@ import type { AuthedUser, Deps } from '../lib/context.js';
 type ProviderRow = typeof schema.aiProviders.$inferSelect;
 
 /** Test seam: lets integration tests substitute a provider factory. */
-export let providerFactory: (p: ProviderId, apiKey: string) => AIProvider = (provider, apiKey) => createProvider({ provider, apiKey });
+let ollamaUrl: string | undefined;
+/** Where the local Ollama server listens (set from config at startup). */
+export function setOllamaUrl(url: string) {
+  ollamaUrl = url;
+}
+export let providerFactory: (p: ProviderId, apiKey: string) => AIProvider = (provider, apiKey) =>
+  createProvider({ provider, apiKey, baseURL: provider === 'ollama' ? ollamaUrl : undefined });
 export function setProviderFactory(f: typeof providerFactory) {
   providerFactory = f;
 }

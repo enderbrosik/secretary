@@ -7,14 +7,15 @@ import { openExternal } from '../../lib/platform';
 import { fmtRelative } from '../../lib/format';
 import { useAIProviders, useApiMutation, type AIProviderDto } from '../../lib/queries';
 import { Badge, Banner, Button, Card, CardHeader, cn, Field, Input, Select, Spinner, Switch } from '../../ui';
+import { LocalAICard } from './LocalAI';
 
 type ProviderId = 'openai' | 'anthropic';
 
 /** Connect / manage the user's own AI provider key. Keys are verified, encrypted server-side and never shown again. */
-export function AIProviderSetup({ onConnected }: { onConnected?: () => void }) {
+export function AIProviderSetup({ onConnected, initial = 'anthropic' }: { onConnected?: () => void; initial?: ProviderId }) {
   const q = useAIProviders();
   const qc = useQueryClient();
-  const [provider, setProvider] = useState<ProviderId>('anthropic');
+  const [provider, setProvider] = useState<ProviderId>(initial);
   const [key, setKey] = useState('');
   const info = q.data?.available[provider];
   const save = useApiMutation(() => api<{ provider: AIProviderDto }>('/api/ai/providers', { method: 'POST', body: { provider, apiKey: key } }), [['ai-providers'], ['me']]);
@@ -92,8 +93,9 @@ export function AISettings() {
       {others.map((p) => (
         <ProviderCard key={p.provider} p={p} />
       ))}
+      <LocalAICard />
       <Card>
-        <CardHeader title={active ? 'Add or replace a provider' : 'Connect an AI provider'} subtitle="Bring your own key. Switch providers at any time." />
+        <CardHeader title="Use an API key instead" subtitle="OpenAI or Anthropic models, billed by the provider. Switch at any time." />
         <div className="px-5 pb-5">{active && !adding ? <Button onClick={() => setAdding(true)}>Add another key</Button> : <AIProviderSetup onConnected={() => setAdding(false)} />}</div>
       </Card>
       <UsageCard />
@@ -117,11 +119,11 @@ function ProviderCard({ p }: { p: AIProviderDto }) {
       <CardHeader
         title={
           <span className="inline-flex items-center gap-2">
-            {p.provider === 'anthropic' ? 'Anthropic' : 'OpenAI'}
+            {p.provider === 'anthropic' ? 'Anthropic' : p.provider === 'ollama' ? 'Local AI (Ollama)' : 'OpenAI'}
             {p.active ? <Badge tone="ok">Active</Badge> : <Badge>Inactive</Badge>}
           </span>
         }
-        subtitle={`Key ${p.keyHint} · last checked ${fmtRelative(p.lastTestedAt)}`}
+        subtitle={p.provider === 'ollama' ? 'Runs on this computer · free · no key' : `Key ${p.keyHint} · last checked ${fmtRelative(p.lastTestedAt)}`}
         actions={
           <>
             <Button size="sm" loading={test.isPending} onClick={async () => { const r = await test.mutateAsync(undefined); r.ok ? toast.success(`Connection works · ${r.modelCount} models available`) : toast.error(r.message ?? 'Test failed'); }}>
@@ -136,7 +138,7 @@ function ProviderCard({ p }: { p: AIProviderDto }) {
       />
       <div className="grid gap-4 px-5 pb-5 sm:grid-cols-2">
         {p.lastError && <div className="sm:col-span-2"><Banner tone="danger">{p.lastError}</Banner></div>}
-        <Field label="Model" hint="Models are listed from your account. The default is chosen from what your key can access.">
+        <Field label="Model" hint={p.provider === 'ollama' ? 'Models downloaded in Ollama on this computer.' : 'Models are listed from your account. The default is chosen from what your key can access.'}>
           {(id) =>
             models.isLoading ? (
               <Spinner />
@@ -154,6 +156,8 @@ function ProviderCard({ p }: { p: AIProviderDto }) {
             )
           }
         </Field>
+        {p.provider !== 'ollama' && (
+          <>
         <Field label="Monthly spending limit (USD)" hint="AI features pause when the estimated cost reaches this. Leave empty for no limit.">
           {(id) => <Input id={id} type="number" min={0} step={1} value={budget} onChange={(e) => setBudget(e.target.value)} onBlur={() => patch.mutate({ monthlyBudgetUsd: num(budget) })} placeholder="No limit" />}
         </Field>
@@ -163,6 +167,8 @@ function ProviderCard({ p }: { p: AIProviderDto }) {
         <Field label="Output price per 1M tokens (USD)" hint={p.defaultPrice ? `Default estimate: $${p.defaultPrice.output}` : undefined}>
           {(id) => <Input id={id} type="number" min={0} step="0.01" value={outPrice} onChange={(e) => setOutPrice(e.target.value)} onBlur={() => patch.mutate({ inputPricePerMTok: num(inPrice), outputPricePerMTok: num(outPrice) })} placeholder={p.defaultPrice ? String(p.defaultPrice.output) : '—'} />}
         </Field>
+          </>
+        )}
         <div className="sm:col-span-2">
           <Switch
             checked={p.sendEmailBodies}

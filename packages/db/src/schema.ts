@@ -64,7 +64,7 @@ export const aiProviders = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    provider: text('provider').notNull().$type<'openai' | 'anthropic'>(),
+    provider: text('provider').notNull().$type<'openai' | 'anthropic' | 'ollama'>(),
     encryptedKey: text('encrypted_key').notNull(),
     keyHint: text('key_hint').notNull(),
     model: text('model'),

@@ -88,7 +88,7 @@ export interface ProviderInfo {
 export const useIntegrations = () => useQuery({ queryKey: ['integrations'], queryFn: () => api<{ providers: ProviderInfo[]; connections: Connection[] }>('/api/integrations') });
 
 export interface AIProviderDto {
-  provider: 'openai' | 'anthropic';
+  provider: 'openai' | 'anthropic' | 'ollama';
   keyHint: string;
   model: string | null;
   active: boolean;

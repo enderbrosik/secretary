@@ -14,7 +14,7 @@ import { monthToDateCost, providerFactory } from '../services/ai.js';
 import { audit } from '../services/audit.js';
 import { getSettings } from '../services/settings.js';
 
-const providerParam = z.object({ provider: z.enum(['openai', 'anthropic']) });
+const providerParam = z.object({ provider: z.enum(['openai', 'anthropic', 'ollama']) });
 const aiLimit = { rateLimit: { max: 20, timeWindow: '1 minute' } };
 
 function aiHttpError(e: unknown): AppError {

@@ -47,6 +47,10 @@ Regression tests: `packages/core/test/briefing.test.ts` (delimiter spoofing, inj
 
 ## What is sent to the AI provider
 
+With **local AI (Ollama)** nothing leaves the machine. Prompts go to `OLLAMA_URL` (default `127.0.0.1:11434`). Only the two recommended models can be downloaded through the API.
+
+With a cloud provider:
+
 Only records relevant to the request, truncated: event titles, times, attendee names and descriptions near today; sender, subject and the newest message text of important recent threads (bodies can be switched off in Settings → AI); recent Slack DMs and mentions; confirmed tasks; the user's name, timezone and style. Never sent: passwords, keys, tokens, attachments, or data from disconnected accounts. The list is shown in Settings → Privacy. Requests go directly from the server to the chosen provider under that provider's API terms.
 
 ## Data controls

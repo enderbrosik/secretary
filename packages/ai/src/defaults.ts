@@ -8,6 +8,7 @@ import type { ModelInfo, ProviderId } from './types.js';
 export const PREFERRED_MODELS: Record<ProviderId, RegExp[]> = {
   anthropic: [/^claude-opus-5-5$/, /^claude-sonnet-5-5$/, /^claude-opus-\d/, /^claude-sonnet-\d/, /^claude-/],
   openai: [/^gpt-5(\.\d+)?$/, /^gpt-5/, /^gpt-4\.1$/, /^gpt-4o$/, /^gpt-/],
+  ollama: [/^qwen3:8b/, /^qwen3:/, /./],
 };
 
 /** Model families that cannot do chat-style text generation and are hidden from the picker. */

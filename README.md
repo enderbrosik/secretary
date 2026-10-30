@@ -7,7 +7,7 @@ Secretary prepares a calm, grounded picture of your day and helps you close it o
 - **Unified tasks** from the app and from Todoist, with AI-detected tasks held for your review.
 - **Inbox** across Gmail / Outlook / Slack sorted by what needs you, with AI reply drafts.
 - **Assistant chat** that cites the records behind every answer.
-- **BYOK AI**: OpenAI or Anthropic with your own API key. Model lists come from your account. You can set a spending limit, and every call's estimated cost is tracked.
+- **AI your way**: free **local AI** on your own computer through the Ollama app (no account, no key, no cost; data stays on the machine), or OpenAI / Anthropic with your own API key (model lists from your account, a spending limit and cost tracking).
 - **You approve every external action.** Drafts, sends, calendar changes and task completions in other apps each wait for your explicit approval.
 
 Runs as a **web app**, and as a **desktop app for macOS, Windows and Linux** (Tauri). The desktop app can run fully local or connect to a server.
@@ -35,7 +35,7 @@ pnpm dev
 
 - Web app: http://localhost:5173. The API runs on :8787, and Vite proxies `/api` to it.
 - Sign up, then in onboarding choose **Load sample data** to try the clearly labelled **demo workspace**. No credentials are needed.
-- Add an OpenAI or Anthropic API key in onboarding or **Settings → AI** for AI summaries. Without a key, Secretary shows rule-based briefings and says so.
+- For AI summaries, pick **Free AI on this computer** in onboarding or **Settings → AI**. Install [Ollama](https://ollama.com/download), then click *Download & use* (Qwen3 4B is 2.5 GB, Qwen3 8B is 5.2 GB). Or paste an OpenAI or Anthropic API key. Without AI, Secretary shows rule-based briefings and says so.
 
 **No Postgres?** Set `DATABASE_URL=pglite:///absolute/path/to/data` to use embedded PostgreSQL (PGlite). This is fine for a single user. Use real PostgreSQL in production.
 
@@ -51,6 +51,7 @@ Each integration needs an OAuth app registered with that provider, and its clien
 | Microsoft 365 (Outlook, Calendar) | the same via Microsoft Graph | Implemented. Tested against mocked Graph APIs. Needs your Entra app to verify live |
 | Slack | DMs and mentions, read-only (no write scopes) | Implemented. Tested against mocked Slack APIs. Needs your Slack app to verify live |
 | Todoist | tasks sync; completing a task there with approval | Implemented. Tested against mocked Todoist APIs. Needs your Todoist app to verify live |
+| Local AI (Ollama) | free on-device AI: detect, download with progress, switch, delete | Implemented. Tested against a mocked Ollama API. Verify by installing Ollama |
 | OpenAI / Anthropic | AI provider (BYOK) | Implemented with the official SDKs. Tested against mocked APIs. Run `pnpm test:live` with your keys to verify |
 | Demo workspace | sample data, cannot send | Works out of the box |
 

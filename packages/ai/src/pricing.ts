@@ -32,6 +32,7 @@ export function priceFor(provider: ProviderId, model: string, override?: PriceOv
   if (override?.inputPricePerMTok != null && override.outputPricePerMTok != null) {
     return { input: override.inputPricePerMTok, output: override.outputPricePerMTok };
   }
+  if (provider === 'ollama') return { input: 0, output: 0 }; // runs locally, free
   const p = PRICES.find((x) => x.provider === provider && x.match.test(model));
   return p ? { input: p.input, output: p.output } : null;
 }

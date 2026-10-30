@@ -199,7 +199,8 @@ export async function dailyRoutes(app: FastifyInstance, deps: Deps) {
     const user = requireUser(req);
     const body = parse(z.object({ threadId: z.string().uuid().nullable().optional(), message: z.string().trim().min(1).max(4000) }), req.body);
     const ac = new AbortController();
-    req.raw.on('close', () => {
+    // The response closing before we finish means the client disconnected (request 'close' fires after the body is read).
+    reply.raw.on('close', () => {
       if (!reply.raw.writableEnded) ac.abort();
     });
     reply.hijack();

@@ -32,6 +32,8 @@ function normalize(node: unknown): unknown {
 
 /** Extracts the first JSON object from a text response (fallback path for models without structured outputs). */
 export function extractJson(text: string): unknown {
+  // Reasoning models may prepend <think>…</think>, which can itself contain braces.
+  text = text.replace(/<think>[\s\S]*?<\/think>/g, '');
   const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
   const candidate = fenced ? fenced[1]! : text;
   const start = candidate.indexOf('{');

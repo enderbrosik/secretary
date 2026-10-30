@@ -31,6 +31,8 @@ const schema = z.object({
   ALLOW_DEMO: bool(true),
   /** Desktop local mode: single-user sidecar bound to loopback. */
   LOCAL_MODE: bool(false),
+  /** Local AI via the free Ollama app (no key). */
+  OLLAMA_URL: z.string().url().default('http://127.0.0.1:11434'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

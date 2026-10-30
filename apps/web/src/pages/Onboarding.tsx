@@ -8,6 +8,7 @@ import type { Settings } from '@secretary/core';
 import { api, errorMessage } from '../lib/api';
 import { useAIProviders, useIntegrations, useMe } from '../lib/queries';
 import { AIProviderSetup } from '../components/settings/AISettings';
+import { LocalAISetup } from '../components/settings/LocalAI';
 import { IntegrationSettings } from '../components/settings/IntegrationSettings';
 import { ScheduleFields, StyleFields } from '../components/settings/PreferenceSettings';
 import { Badge, Banner, Button, Card, cn } from '../ui';
@@ -21,7 +22,7 @@ export default function OnboardingPage() {
   const ai = useAIProviders();
   const integ = useIntegrations();
   const [step, setStep] = useState(0);
-  const [provider, setProvider] = useState<'anthropic' | 'openai'>('anthropic');
+  const [provider, setProvider] = useState<'local' | 'anthropic' | 'openai'>('local');
   const [prefs, setPrefs] = useState<Settings>(() => me.data!.settings!);
   const [busy, setBusy] = useState(false);
   const hasAI = ai.data?.configured.some((p) => p.active);
@@ -81,11 +82,17 @@ export default function OnboardingPage() {
             )}
             {step === 1 && (
               <Step title="Choose your AI provider" subtitle="Secretary uses an AI model for summaries, prioritization and suggestions. Deadlines and conflicts are always computed from your data directly.">
-                <div className="grid gap-3 sm:grid-cols-2" role="radiogroup">
-                  {(['anthropic', 'openai'] as const).map((p) => (
+                <div className="grid gap-3 sm:grid-cols-3" role="radiogroup">
+                  {(
+                    [
+                      ['local', 'Free AI on this computer', 'Recommended. No account or key — uses the free Ollama app. Private.'],
+                      ['anthropic', 'Anthropic (Claude)', 'Strongest results. Needs an API key, billed by Anthropic.'],
+                      ['openai', 'OpenAI (GPT)', 'Needs an API key, billed by OpenAI.'],
+                    ] as const
+                  ).map(([p, t, d]) => (
                     <button key={p} role="radio" aria-checked={provider === p} onClick={() => setProvider(p)} className={cn('rounded-xl border p-5 text-left', provider === p ? 'border-accent bg-accent-soft/50 ring-2 ring-accent/20' : 'border-line bg-surface hover:border-line-strong')}>
-                      <div className="text-[15px] font-semibold">{p === 'anthropic' ? 'Anthropic' : 'OpenAI'}</div>
-                      <div className="mt-1 text-[13px] text-muted">{p === 'anthropic' ? 'Claude models via the Claude API' : 'GPT models via the OpenAI API'}</div>
+                      <div className="text-[15px] font-semibold">{t}</div>
+                      <div className="mt-1 text-[13px] text-muted">{d}</div>
                     </button>
                   ))}
                 </div>
@@ -93,13 +100,13 @@ export default function OnboardingPage() {
               </Step>
             )}
             {step === 2 && (
-              <Step title="Connect your AI provider" subtitle="Paste an API key. It’s verified with the provider and stored encrypted on the server.">
+              <Step title={provider === 'local' ? 'Set up free local AI' : 'Connect your AI provider'} subtitle={provider === 'local' ? 'One free app and one download. After that it just works — no key, no bills.' : 'Paste an API key. It’s verified with the provider and stored encrypted on the server.'}>
                 {hasAI ? (
                   <Banner tone="ok" title="Connected" icon={<Check className="size-4" />}>
-                    {ai.data!.configured.find((p) => p.active)!.provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} is connected using {ai.data!.configured.find((p) => p.active)!.model}.
+                    {{ anthropic: 'Anthropic', openai: 'OpenAI', ollama: 'Local AI' }[ai.data!.configured.find((p) => p.active)!.provider]} is connected using {ai.data!.configured.find((p) => p.active)!.model}.
                   </Banner>
                 ) : (
-                  <AIProviderSetup onConnected={next} key={provider} />
+                  provider === 'local' ? <LocalAISetup onConnected={next} /> : <AIProviderSetup onConnected={next} key={provider} initial={provider} />
                 )}
               </Step>
             )}

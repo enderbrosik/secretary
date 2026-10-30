@@ -1,12 +1,14 @@
 import { AnthropicProvider } from './anthropic.js';
 import { OpenAIProvider } from './openai.js';
+import { OllamaProvider } from './ollama.js';
 import type { AIProvider, ProviderId } from './types.js';
 
 export * from './types.js';
 export * from './schema.js';
 export * from './pricing.js';
 export * from './defaults.js';
-export { AnthropicProvider, OpenAIProvider };
+export { AnthropicProvider, OllamaProvider, OpenAIProvider };
+export { DEFAULT_OLLAMA_URL, RECOMMENDED_LOCAL_MODELS, type OllamaModel } from './ollama.js';
 
 export interface ProviderConfig {
   provider: ProviderId;
@@ -23,10 +25,18 @@ export function createProvider(cfg: ProviderConfig): AIProvider {
       return new OpenAIProvider(cfg);
     case 'anthropic':
       return new AnthropicProvider(cfg);
+    case 'ollama':
+      return new OllamaProvider({ baseURL: cfg.baseURL, timeoutMs: cfg.timeoutMs });
   }
 }
 
 export const PROVIDER_INFO: Record<ProviderId, { name: string; keyUrl: string; billingNote: string; keyPrefix: string }> = {
+  ollama: {
+    name: 'Local AI (Ollama)',
+    keyUrl: 'https://ollama.com/download',
+    keyPrefix: '',
+    billingNote: 'Runs on your own computer with the free Ollama app. No account, no API key and no cost — your data never leaves the machine.',
+  },
   openai: {
     name: 'OpenAI',
     keyUrl: 'https://platform.openai.com/api-keys',

@@ -1,12 +1,14 @@
 import type { ZodType } from 'zod';
 
-export type ProviderId = 'openai' | 'anthropic';
+export type ProviderId = 'openai' | 'anthropic' | 'ollama';
 
 export interface ModelInfo {
   id: string;
   displayName: string;
   createdAt: string | null;
   deprecated: boolean;
+  /** USD per million tokens when known (0 for local models). */
+  pricing?: { input: number; output: number } | null;
 }
 
 export interface Usage {
