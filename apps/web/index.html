@@ -10,7 +10,15 @@
     <script src="/theme-init.js"></script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Shown until the app loads (the desktop app may be starting its local server). -->
+      <div style="min-height:100vh;display:grid;place-items:center;font:14px/1.5 system-ui,-apple-system,sans-serif;color:#77726a">
+        <div style="text-align:center">
+          <img src="/favicon.svg" alt="" width="44" height="44" style="border-radius:12px" />
+          <div style="margin-top:12px">Starting Secretary…</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

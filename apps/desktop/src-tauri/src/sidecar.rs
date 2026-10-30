@@ -2,12 +2,13 @@
 //! bound to 127.0.0.1 on a random free port. The master encryption key is generated once and
 //! kept in the OS credential store, so data at rest is unreadable without the user's login.
 
-use std::io::{BufRead, BufReader};
+use std::fs::OpenOptions;
+use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use base64::Engine;
 use rand::RngCore;
@@ -47,7 +48,27 @@ fn master_key(store: &SecretStore) -> Result<String, String> {
     Ok(k)
 }
 
-pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, extra_env: Option<PathBuf>, store: &SecretStore) -> Result<LocalServer, String> {
+/// Last lines of the server log, included in startup errors so problems are diagnosable.
+fn log_tail(log: &Path, lines: usize) -> String {
+    let text = std::fs::read_to_string(log).unwrap_or_default();
+    let all: Vec<&str> = text.lines().collect();
+    all[all.len().saturating_sub(lines)..].join("\n")
+}
+
+/// Starts the server and waits (off the UI thread) until it reports ready, exits, or times out.
+/// All server output goes to `log_path`.
+pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, extra_env: Option<PathBuf>, store: &SecretStore, log_path: PathBuf) -> Result<LocalServer, String> {
+    if let Some(dir) = log_path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let mut log = OpenOptions::new().create(true).append(true).open(&log_path).map_err(|e| format!("Cannot write log {}: {e}", log_path.display()))?;
+    let _ = writeln!(log, "\n--- starting local server: {} {}", node_bin.display(), server_dir.join("main.mjs").display());
+    if !node_bin.exists() {
+        return Err(format!("The bundled runtime is missing: {}", node_bin.display()));
+    }
+    if !server_dir.join("main.mjs").exists() {
+        return Err(format!("The bundled server is missing: {}", server_dir.display()));
+    }
     let port = free_port().map_err(|e| e.to_string())?;
     let url = format!("http://127.0.0.1:{port}");
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
@@ -81,25 +102,32 @@ pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, extra_en
         .env("MASTER_KEY", master_key(store)?)
         .env("LOG_LEVEL", "warn")
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::from(log.try_clone().map_err(|e| e.to_string())?))
         .spawn()
         .map_err(|e| format!("Could not start the local server: {e}"))?;
 
-    // Wait for the readiness line.
+    // Mirror stdout to the log and watch for the readiness line.
     let stdout = child.stdout.take().ok_or("no stdout")?;
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            let _ = writeln!(log, "{line}");
             if line.starts_with("SECRETARY_READY") {
                 let _ = tx.send(());
             }
         }
     });
-    match rx.recv_timeout(Duration::from_secs(60)) {
-        Ok(()) => Ok(LocalServer { url, child }),
-        Err(_) => {
+    let deadline = Instant::now() + Duration::from_secs(90);
+    loop {
+        if rx.recv_timeout(Duration::from_millis(250)).is_ok() {
+            return Ok(LocalServer { url, child });
+        }
+        if let Ok(Some(status)) = child.try_wait() {
+            return Err(format!("The local server stopped during startup ({status}).\n\n{}\n\nFull log: {}", log_tail(&log_path, 25), log_path.display()));
+        }
+        if Instant::now() > deadline {
             let _ = child.kill();
-            Err("The local server did not start within 60 seconds.".into())
+            return Err(format!("The local server did not start within 90 seconds.\n\n{}\n\nFull log: {}", log_tail(&log_path, 25), log_path.display()));
         }
     }
 }

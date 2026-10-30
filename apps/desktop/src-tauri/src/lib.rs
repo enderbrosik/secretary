@@ -2,7 +2,8 @@ mod secrets;
 mod sidecar;
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -31,8 +32,16 @@ struct AppState {
     config: Mutex<DesktopConfig>,
     config_path: PathBuf,
     secrets: SecretStore,
-    local: Mutex<Option<sidecar::LocalServer>>,
-    local_error: Mutex<Option<String>>,
+    local: Arc<LocalStatus>,
+}
+
+/// Local server startup runs on a background thread so the window never freezes.
+#[derive(Default)]
+struct LocalStatus {
+    server: Mutex<Option<sidecar::LocalServer>>,
+    /// None while starting; Some(Ok(url)) when ready; Some(Err(msg)) if startup failed.
+    outcome: Mutex<Option<Result<String, String>>>,
+    done: Condvar,
 }
 
 impl AppState {
@@ -48,7 +57,10 @@ impl AppState {
         if cfg.mode == "remote" {
             cfg.url.trim_end_matches('/').to_string()
         } else {
-            self.local.lock().unwrap().as_ref().map(|s| s.url.clone()).unwrap_or_default()
+            match &*self.local.outcome.lock().unwrap() {
+                Some(Ok(url)) => url.clone(),
+                _ => String::new(),
+            }
         }
     }
 }
@@ -59,14 +71,26 @@ struct ServerConfig {
     url: String,
 }
 
+/// Waits (off the UI thread) for the local server when in local mode.
 #[tauri::command]
-fn get_server_config(state: State<AppState>) -> Result<ServerConfig, String> {
-    if let Some(err) = state.local_error.lock().unwrap().clone() {
-        if state.config.lock().unwrap().mode == "local" {
-            return Err(err);
-        }
+async fn get_server_config(state: State<'_, AppState>) -> Result<ServerConfig, String> {
+    let mode = state.config.lock().unwrap().mode.clone();
+    if mode == "local" {
+        let local = state.local.clone();
+        let outcome = tauri::async_runtime::spawn_blocking(move || {
+            let guard = local.outcome.lock().unwrap();
+            let (guard, _) = local.done.wait_timeout_while(guard, Duration::from_secs(120), |o| o.is_none()).unwrap();
+            guard.clone()
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        return match outcome {
+            Some(Ok(url)) => Ok(ServerConfig { mode, url }),
+            Some(Err(e)) => Err(e),
+            None => Err("The local server is still starting. Please wait a moment and reopen Secretary.".into()),
+        };
     }
-    Ok(ServerConfig { mode: state.config.lock().unwrap().mode.clone(), url: state.server_url() })
+    Ok(ServerConfig { mode, url: state.server_url() })
 }
 
 #[tauri::command]
@@ -228,17 +252,30 @@ pub fn run() {
                 config: Mutex::new(config.clone()),
                 config_path,
                 secrets: SecretStore::new(data_dir.clone()),
-                local: Mutex::new(None),
-                local_error: Mutex::new(None),
+                local: Arc::new(LocalStatus::default()),
             };
 
             if config.mode == "local" {
                 let node = std::env::current_exe()?.parent().map(|p| p.join(if cfg!(windows) { "secretary-node.exe" } else { "secretary-node" })).unwrap();
                 let server_dir = app.path().resource_dir()?.join("server");
-                match sidecar::start(node, server_dir, data_dir.join("local"), Some(config_dir.join("server.env")), &state.secrets) {
-                    Ok(srv) => *state.local.lock().unwrap() = Some(srv),
-                    Err(e) => *state.local_error.lock().unwrap() = Some(e),
-                }
+                let log_path = app.path().app_log_dir().unwrap_or_else(|_| data_dir.join("logs")).join("server.log");
+                let secrets = state.secrets.clone();
+                let local = state.local.clone();
+                let extra_env = config_dir.join("server.env");
+                let local_dir = data_dir.join("local");
+                std::thread::spawn(move || {
+                    let result = sidecar::start(node, server_dir, local_dir, Some(extra_env), &secrets, log_path);
+                    let outcome = match result {
+                        Ok(srv) => {
+                            let url = srv.url.clone();
+                            *local.server.lock().unwrap() = Some(srv);
+                            Ok(url)
+                        }
+                        Err(e) => Err(e),
+                    };
+                    *local.outcome.lock().unwrap() = Some(outcome);
+                    local.done.notify_all();
+                });
             }
             app.manage(state);
 
@@ -300,6 +337,14 @@ pub fn run() {
             set_tray_badge,
             check_for_updates
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Secretary");
+        .build(tauri::generate_context!())
+        .expect("error while building Secretary")
+        .run(|app, event| {
+            // Stop the local server when the app quits, so no background process is left behind.
+            if let tauri::RunEvent::Exit = event {
+                if let Some(state) = app.try_state::<AppState>() {
+                    drop(state.local.server.lock().unwrap().take());
+                }
+            }
+        });
 }

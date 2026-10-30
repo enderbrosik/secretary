@@ -35,7 +35,7 @@
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico", "icons/icon.png"],
     "externalBin": ["binaries/secretary-node"],
     "resources": { "resources/server/": "server/" },
-    "macOS": { "minimumSystemVersion": "11.0", "entitlements": null },
+    "macOS": { "minimumSystemVersion": "11.0", "entitlements": "./Entitlements.plist" },
     "windows": { "webviewInstallMode": { "type": "downloadBootstrapper" } },
     "linux": { "deb": { "depends": [] } }
   },

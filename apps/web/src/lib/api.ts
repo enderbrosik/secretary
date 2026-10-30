@@ -99,5 +99,6 @@ export async function apiStream<E>(path: string, body: unknown, onEvent: (e: E) 
 export function errorMessage(e: unknown): string {
   if (e instanceof ApiError) return e.message;
   if (e instanceof Error) return e.message;
+  if (typeof e === 'string' && e) return e; // errors from the desktop shell arrive as strings
   return 'Something went wrong';
 }

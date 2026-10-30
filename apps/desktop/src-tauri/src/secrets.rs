@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 const SERVICE: &str = "app.secretary.desktop";
 
+#[derive(Clone)]
 pub struct SecretStore {
     fallback_dir: PathBuf,
 }

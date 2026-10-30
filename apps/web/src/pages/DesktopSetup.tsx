@@ -27,7 +27,9 @@ export default function DesktopSetupPage({ error }: { error?: unknown }) {
         <p className="mt-1 text-muted">You can change this later.</p>
         {error ? (
           <div className="mt-4">
-            <Banner tone="danger" title="Can’t reach the server">{errorMessage(error)}</Banner>
+            <Banner tone="danger" title="Secretary couldn’t start its local server">
+              <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans text-[12.5px]">{errorMessage(error)}</pre>
+            </Banner>
           </div>
         ) : null}
         <div className="mt-6 grid gap-3">
