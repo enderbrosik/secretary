@@ -54,3 +54,12 @@ describe('release mode: built-in OAuth apps only', () => {
     expect(decodeURIComponent(cb.headers.location as string)).toMatch(/declined/);
   });
 });
+
+describe('local mode: several accounts on one computer', () => {
+  it('lets a second person create their own account, with separate data', async () => {
+    const other = await signup(t);
+    const mine = (await api('POST', '/api/tasks', { title: 'Only mine' })).json();
+    const theirs = (await t.app.inject({ method: 'GET', url: '/api/tasks?filter=all', headers: other.headers })).json();
+    expect(theirs.find((x: { id: string }) => x.id === mine.id)).toBeUndefined();
+  });
+});

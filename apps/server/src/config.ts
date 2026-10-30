@@ -29,7 +29,7 @@ const schema = z.object({
   SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(5).default(15),
   ALLOW_SIGNUP: bool(true),
   ALLOW_DEMO: bool(true),
-  /** Desktop local mode: single-user sidecar bound to loopback. */
+  /** Desktop local mode: sidecar bound to loopback. Several accounts can share one installation. */
   LOCAL_MODE: bool(false),
   /** Local AI via the free Ollama app (no key). */
   OLLAMA_URL: z.string().url().default('http://127.0.0.1:11434'),

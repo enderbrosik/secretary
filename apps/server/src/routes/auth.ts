@@ -1,4 +1,4 @@
-import { and, count, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { isValidTimezone, loginSchema, signupSchema } from '@secretary/core';
@@ -20,10 +20,6 @@ export async function authRoutes(app: FastifyInstance, deps: Deps) {
   app.post('/api/auth/signup', { config: authLimit }, async (req, reply) => {
     const body = parse(signupSchema.extend({ client: z.enum(['web', 'desktop']).default('web') }), req.body);
     if (!deps.config.ALLOW_SIGNUP) throw forbidden('Sign-up is disabled on this server');
-    if (deps.config.LOCAL_MODE) {
-      const [{ n }] = (await deps.db.select({ n: count() }).from(schema.users)) as [{ n: number }];
-      if (Number(n) > 0) throw forbidden('This local installation already has an account. Sign in instead.');
-    }
     const [existing] = await deps.db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, body.email));
     if (existing) throw conflict('An account with this email already exists');
     const id = crypto.randomUUID();
