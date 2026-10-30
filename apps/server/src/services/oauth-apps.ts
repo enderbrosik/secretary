@@ -10,13 +10,14 @@ export interface OAuthCreds {
 }
 
 /**
- * OAuth app credentials: environment variables win (hosted servers). In desktop local mode the
- * single user can also enter them in Settings, stored encrypted with the master key.
+ * OAuth app credentials: environment variables (hosted servers, and the app's built-in
+ * credentials in desktop releases). With the CUSTOM_OAUTH_APPS developer option in local
+ * mode, apps registered in Settings are used too, stored encrypted with the master key.
  */
 export async function getOAuthCredentials(deps: Deps, provider: string): Promise<(OAuthCreds & { source: 'env' | 'app' }) | null> {
   const env = oauthCredentials(deps.config, provider);
   if (env) return { ...env, source: 'env' };
-  if (!deps.config.LOCAL_MODE) return null;
+  if (!deps.config.LOCAL_MODE || !deps.config.CUSTOM_OAUTH_APPS) return null;
   const [row] = await deps.db.select().from(schema.oauthApps).where(eq(schema.oauthApps.provider, provider));
   if (!row) return null;
   return {

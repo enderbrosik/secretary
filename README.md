@@ -88,4 +88,5 @@ docs/           architecture, setup, security, deployment, desktop, user guide
 - [Security & privacy](docs/SECURITY.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Desktop app](docs/DESKTOP.md)
+- [Publishing: built-in sign-in for every user](docs/PUBLISHING.md)
 - [User guide](docs/USER-GUIDE.md)

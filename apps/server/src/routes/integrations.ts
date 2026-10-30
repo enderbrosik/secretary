@@ -23,8 +23,20 @@ const PROVIDER_DOCS: Record<string, string> = {
   todoist: 'docs/SETUP-INTEGRATIONS.md#todoist',
 };
 
+const RELAY_PROVIDERS = new Set(['slack', 'todoist']);
+
 export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
   const redirectUri = (provider: string) => `${deps.config.PUBLIC_URL}/api/integrations/callback/${provider}`;
+  // Slack and Todoist only redirect to HTTPS, so in local mode their consent screens return
+  // to a static relay page, which forwards to this loopback server (see oauth-relay in the site).
+  const viaRelay = (provider: string) => deps.config.LOCAL_MODE && !!deps.config.OAUTH_RELAY_URL && RELAY_PROVIDERS.has(provider);
+  const authRedirect = (provider: string) => (viaRelay(provider) ? deps.config.OAUTH_RELAY_URL! : redirectUri(provider));
+  const newState = (provider: string) => {
+    const token = randomToken(24);
+    // The relay reads where to forward to from the state: "<port>.<provider>.<random>".
+    return viaRelay(provider) ? `${new URL(deps.config.PUBLIC_URL).port || '80'}.${provider}.${token}` : token;
+  };
+  const developer = deps.config.LOCAL_MODE && deps.config.CUSTOM_OAUTH_APPS;
   const clamp = (f: Features, provider: string): Features => {
     const s = getConnector(provider)!.supports;
     return { calendar: f.calendar && s.calendar, email: f.email && s.email, messages: f.messages && s.messages, tasks: f.tasks && s.tasks };
@@ -42,11 +54,11 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
           supports: c.supports,
           configured: c.provider === 'demo' ? deps.config.ALLOW_DEMO : !!creds,
           appSource: creds?.source ?? null,
-          // In desktop local mode the user can register their own OAuth app in Settings.
-          canConfigureApp: deps.config.LOCAL_MODE && c.provider !== 'demo' && creds?.source !== 'env',
-          tokenConnect: !!c.connectWithToken,
+          // Developer option only: register your own OAuth app or paste a token in Settings.
+          canConfigureApp: developer && c.provider !== 'demo' && creds?.source !== 'env',
+          tokenConnect: developer && !!c.connectWithToken,
           setupDoc: PROVIDER_DOCS[c.provider] ?? null,
-          redirectUri: c.provider === 'demo' ? null : redirectUri(c.provider),
+          redirectUri: c.provider === 'demo' ? null : authRedirect(c.provider),
         };
       }),
     );
@@ -74,7 +86,7 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
     const user = requireUser(req);
     const connector = getConnector(req.params.provider);
     if (!connector || connector.provider === 'demo') throw notFound('Integration');
-    if (!deps.config.LOCAL_MODE) throw forbidden('OAuth apps are configured by the server administrator on hosted servers.');
+    if (!developer) throw forbidden('OAuth apps are built into Secretary and can’t be changed here.');
     const body = parse(
       z.object({
         clientId: z.string().trim().min(8).max(300).regex(/^[\w.\-:@]+$/, 'That doesn’t look like a client ID'),
@@ -90,7 +102,7 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
 
   app.delete<{ Params: { provider: string } }>('/api/integrations/:provider/app', async (req) => {
     const user = requireUser(req);
-    if (!deps.config.LOCAL_MODE) throw forbidden('Not available on hosted servers');
+    if (!developer) throw forbidden('OAuth apps are built into Secretary and can’t be changed here.');
     await deleteOAuthApp(deps, req.params.provider);
     await audit(deps, user.id, 'integration.app_removed', { detail: { provider: req.params.provider } });
     return { ok: true };
@@ -104,6 +116,7 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
     const user = requireUser(req);
     const connector = getConnector(req.params.provider);
     if (!connector?.connectWithToken) throw notFound('Token connection');
+    if (!developer) throw forbidden('Connect this account with the Connect button instead.');
     const body = parse(z.object({ token: z.string().trim().min(10).max(500), tier: z.enum(PERMISSION_TIERS).default('read') }), req.body);
     let result;
     try {
@@ -169,9 +182,9 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
 
     const creds = await getOAuthCredentials(deps, connector.provider);
     if (!creds) {
-      throw new AppError(409, 'integration_not_configured', deps.config.LOCAL_MODE ? `${connector.name} needs a one-time setup first. Click “Set up” next to it in Settings → Integrations.` : `${connector.name} isn't configured on this server yet. An administrator needs to register an OAuth app and set its client ID and secret (see ${PROVIDER_DOCS[connector.provider]}).`);
+      throw new AppError(409, 'integration_not_configured', deps.config.LOCAL_MODE ? `${connector.name} isn’t available in this version of Secretary yet.` : `${connector.name} isn't configured on this server yet. An administrator needs to register an OAuth app and set its client ID and secret (see ${PROVIDER_DOCS[connector.provider]}).`);
     }
-    const state = randomToken(24);
+    const state = newState(connector.provider);
     const { verifier, challenge } = pkcePair();
     await deps.db.delete(schema.oauthStates).where(lt(schema.oauthStates.expiresAt, deps.now().toISOString()));
     await deps.db.insert(schema.oauthStates).values({
@@ -179,14 +192,14 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
       userId: user.id,
       provider: connector.provider,
       encryptedVerifier: deps.keys.encrypt(user, `pkce:${state}`, verifier),
-      redirectUri: redirectUri(connector.provider),
+      redirectUri: authRedirect(connector.provider),
       tier: body.tier,
       features,
       returnTo: body.client === 'desktop' ? 'desktop' : '/settings/integrations',
       expiresAt: new Date(deps.now().getTime() + 10 * 60_000).toISOString(),
     });
     const scopes = connector.scopesFor(features, body.tier);
-    return { authUrl: connector.buildAuthUrl({ creds, redirectUri: redirectUri(connector.provider), state, codeChallenge: challenge, scopes }), scopes };
+    return { authUrl: connector.buildAuthUrl({ creds, redirectUri: authRedirect(connector.provider), state, codeChallenge: challenge, scopes }), scopes };
   });
 
   /**

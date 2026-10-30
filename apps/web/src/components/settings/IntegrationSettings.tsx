@@ -98,6 +98,8 @@ export function IntegrationSettings({ compact }: { compact?: boolean }) {
                     </Button>
                     <span className="text-[12px] text-muted">One-time, about 5–10 minutes.</span>
                   </div>
+                ) : isDesktop ? (
+                  <p className="text-[12.5px] text-muted">Coming soon</p>
                 ) : (
                   <div className="text-[12.5px] text-muted">
                     <p>Not available on this server yet — it needs {p.name.split(' ')[0]} app credentials.</p>

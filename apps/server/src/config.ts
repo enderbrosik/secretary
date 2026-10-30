@@ -33,6 +33,16 @@ const schema = z.object({
   LOCAL_MODE: bool(false),
   /** Local AI via the free Ollama app (no key). */
   OLLAMA_URL: z.string().url().default('http://127.0.0.1:11434'),
+  /**
+   * Developer option (local mode): register your own OAuth apps or paste provider tokens in
+   * Settings. Off in releases, where the app's built-in OAuth apps are used.
+   */
+  CUSTOM_OAUTH_APPS: bool(false),
+  /**
+   * HTTPS page that forwards OAuth redirects to this loopback server, for providers that
+   * only accept HTTPS redirect URLs (Slack, Todoist). Used in local mode only.
+   */
+  OAUTH_RELAY_URL: z.string().url().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
@@ -67,10 +77,9 @@ export function oauthCredentials(c: Config, provider: string): { clientId: strin
   switch (provider) {
     case 'google':
       return pick(c.GOOGLE_CLIENT_ID, c.GOOGLE_CLIENT_SECRET);
-    case 'microsoft': {
-      const p = pick(c.MICROSOFT_CLIENT_ID, c.MICROSOFT_CLIENT_SECRET);
-      return p ? { ...p, tenant: c.MICROSOFT_TENANT } : null;
-    }
+    case 'microsoft':
+      // A public client ("Mobile and desktop" platform) has no secret and relies on PKCE.
+      return c.MICROSOFT_CLIENT_ID ? { clientId: c.MICROSOFT_CLIENT_ID, clientSecret: c.MICROSOFT_CLIENT_SECRET ?? '', tenant: c.MICROSOFT_TENANT } : null;
     case 'slack':
       return pick(c.SLACK_CLIENT_ID, c.SLACK_CLIENT_SECRET);
     case 'todoist':

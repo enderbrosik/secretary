@@ -9,7 +9,7 @@ let t: TestApp;
 let s: Session;
 beforeAll(async () => {
   mock.listen({ onUnhandledRequest: 'bypass' });
-  t = await createTestApp({ LOCAL_MODE: 'true' });
+  t = await createTestApp({ LOCAL_MODE: 'true', CUSTOM_OAUTH_APPS: 'true' });
   s = await signup(t);
 });
 afterEach(() => mock.resetHandlers());

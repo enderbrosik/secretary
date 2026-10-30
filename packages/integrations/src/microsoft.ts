@@ -24,6 +24,9 @@ function toTokenSet(t: MsToken, prev: TokenSet | null): TokenSet {
   };
 }
 
+/** Public clients (desktop apps) have no secret and rely on PKCE. */
+const secret = (creds: { clientSecret: string }): Record<string, string> => (creds.clientSecret ? { client_secret: creds.clientSecret } : {});
+
 export const microsoftConnector: Connector = {
   provider: 'microsoft',
   name: 'Microsoft 365 (Outlook & Calendar)',
@@ -78,7 +81,7 @@ export const microsoftConnector: Connector = {
 
   async exchangeCode({ creds, code, codeVerifier, redirectUri }) {
     const t = await request<MsToken>('Microsoft', `${authBase(creds.tenant)}/token`, {
-      form: { client_id: creds.clientId, client_secret: creds.clientSecret, code, redirect_uri: redirectUri, grant_type: 'authorization_code', code_verifier: codeVerifier },
+      form: { client_id: creds.clientId, ...secret(creds), code, redirect_uri: redirectUri, grant_type: 'authorization_code', code_verifier: codeVerifier },
     });
     const tokens = toTokenSet(t, null);
     const me = await request<{ id: string; mail?: string | null; userPrincipalName?: string; displayName?: string }>('Microsoft', `${GRAPH}/me`, {
@@ -92,7 +95,7 @@ export const microsoftConnector: Connector = {
   async refresh(tokens, creds) {
     if (!tokens.refreshToken) throw new IntegrationError('auth_expired', 'Microsoft refresh token missing; reconnect the account');
     const t = await request<MsToken>('Microsoft', `${authBase(creds.tenant)}/token`, {
-      form: { client_id: creds.clientId, client_secret: creds.clientSecret, refresh_token: tokens.refreshToken, grant_type: 'refresh_token' },
+      form: { client_id: creds.clientId, ...secret(creds), refresh_token: tokens.refreshToken, grant_type: 'refresh_token' },
     }).catch((e) => {
       if (e instanceof IntegrationError && e.code === 'bad_response') throw new IntegrationError('auth_expired', 'Microsoft access was revoked; reconnect the account');
       throw e;

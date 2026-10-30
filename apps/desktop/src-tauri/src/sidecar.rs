@@ -30,6 +30,24 @@ impl Drop for LocalServer {
 /// can be registered once. Falls back to a random free port if it is taken.
 pub const PREFERRED_PORT: u16 = 47821;
 
+/// The app's own OAuth apps, compiled into release builds from CI secrets, so people
+/// just click Connect. Desktop OAuth clients can't keep a secret confidential; Google and
+/// Slack/Todoist still require one, and every flow is bound to a single-use state (plus PKCE
+/// where the provider supports it).
+const BUILT_IN_OAUTH: [(&str, Option<&str>); 8] = [
+    ("GOOGLE_CLIENT_ID", option_env!("SECRETARY_GOOGLE_CLIENT_ID")),
+    ("GOOGLE_CLIENT_SECRET", option_env!("SECRETARY_GOOGLE_CLIENT_SECRET")),
+    ("MICROSOFT_CLIENT_ID", option_env!("SECRETARY_MICROSOFT_CLIENT_ID")),
+    ("MICROSOFT_CLIENT_SECRET", option_env!("SECRETARY_MICROSOFT_CLIENT_SECRET")),
+    ("SLACK_CLIENT_ID", option_env!("SECRETARY_SLACK_CLIENT_ID")),
+    ("SLACK_CLIENT_SECRET", option_env!("SECRETARY_SLACK_CLIENT_SECRET")),
+    ("TODOIST_CLIENT_ID", option_env!("SECRETARY_TODOIST_CLIENT_ID")),
+    ("TODOIST_CLIENT_SECRET", option_env!("SECRETARY_TODOIST_CLIENT_SECRET")),
+];
+
+/// HTTPS page that forwards Slack/Todoist sign-in redirects to the local server.
+const DEFAULT_OAUTH_RELAY: &str = "https://enderbrosik.github.io/secretary/oauth/";
+
 fn free_port() -> std::io::Result<u16> {
     if TcpListener::bind(("127.0.0.1", PREFERRED_PORT)).is_ok() {
         return Ok(PREFERRED_PORT);
@@ -74,13 +92,19 @@ pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, extra_en
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     let db = data_dir.join("db");
     let mut cmd = Command::new(node_bin);
-    // Optional OAuth app credentials for local mode (KEY=VALUE lines); core settings below always win.
+    for (key, value) in BUILT_IN_OAUTH {
+        if let Some(v) = value.filter(|v| !v.is_empty()) {
+            cmd.env(key, v);
+        }
+    }
+    cmd.env("OAUTH_RELAY_URL", option_env!("SECRETARY_OAUTH_RELAY_URL").filter(|v| !v.is_empty()).unwrap_or(DEFAULT_OAUTH_RELAY));
+    // Developer overrides (KEY=VALUE lines in server.env); core settings below always win.
     if let Some(path) = extra_env {
         if let Ok(text) = std::fs::read_to_string(path) {
             for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
                 if let Some((k, v)) = line.split_once('=') {
                     let k = k.trim();
-                    if k.ends_with("_CLIENT_ID") || k.ends_with("_CLIENT_SECRET") || k == "MICROSOFT_TENANT" {
+                    if k.ends_with("_CLIENT_ID") || k.ends_with("_CLIENT_SECRET") || k == "MICROSOFT_TENANT" || k == "CUSTOM_OAUTH_APPS" || k == "OAUTH_RELAY_URL" {
                         cmd.env(k, v.trim());
                     }
                 }

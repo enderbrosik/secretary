@@ -87,4 +87,41 @@ await writeFile(
 </div>`,
   }),
 );
+// OAuth relay for the desktop app: Slack and Todoist only redirect to HTTPS, so their
+// consent screens return here and this page forwards the result to the app's loopback
+// server. The state ("<port>.<provider>.<random>") is checked again, single-use, by the app.
+await mkdir(join(out, 'oauth'), { recursive: true });
+await writeFile(
+  join(out, 'oauth', 'index.html'),
+  `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Returning to Secretary…</title>
+<style>${CSS}</style>
+</head>
+<body>
+<main>
+<h1>Returning to Secretary…</h1>
+<p id="msg">If nothing happens, make sure the Secretary app is open, then try connecting again.</p>
+</main>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var m = /^(\\d{2,5})\\.(slack|todoist)\\.[\\w-]+$/.exec(q.get('state') || '');
+  var port = m ? Number(m[1]) : 0;
+  if (!m || port < 1024 || port > 65535) {
+    document.getElementById('msg').textContent = 'This sign-in link is invalid. Open Secretary and try connecting again.';
+    return;
+  }
+  location.replace('http://127.0.0.1:' + port + '/api/integrations/callback/' + m[2] + location.search);
+})();
+</script>
+</body>
+</html>
+`,
+);
 console.log(`Legal site written to ${out}`);
