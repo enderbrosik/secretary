@@ -23,7 +23,7 @@ jobs:
       - name: Unit & integration tests (embedded PGlite)
         run: pnpm test
       - name: Server integration tests against PostgreSQL 16
-        run: pnpm --filter @secretary/server exec vitest run test/jobs.test.ts test/integrations-actions.test.ts
+        run: pnpm --filter @secretary/server exec vitest run --no-file-parallelism test/jobs.test.ts test/integrations-actions.test.ts
         env: { TEST_DATABASE_URL: postgres://secretary:secretary@localhost:5432/secretary_test }
       - run: pnpm --filter @secretary/web exec playwright install --with-deps chromium
       - name: End-to-end (desktop, tablet, mobile viewports)
