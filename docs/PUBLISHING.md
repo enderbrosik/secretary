@@ -12,7 +12,7 @@ How it fits together:
 - Google and Microsoft redirect straight back to the app's local server
   (`http://127.0.0.1:<port>/api/integrations/callback/<provider>`).
 - Slack and Todoist only redirect to HTTPS, so they return to
-  `https://enderbrosik.github.io/secretary/oauth/`, a static page (built with the legal site) that
+  `https://getsecretary.vercel.app/oauth/`, a static page (built with the legal site) that
   forwards the result to `127.0.0.1`. It forwards only to loopback, and the app accepts each
   sign-in state once, within 10 minutes.
 - A service without credentials shows **Coming soon** in the app.
@@ -42,8 +42,8 @@ GitHub Actions) for the privacy policy, terms and Slack/Todoist relay.
 
 1. Google Cloud Console → your project → enable **Gmail API** and **Google Calendar API**.
 2. Google Auth Platform → **Branding**: app name, support email, home page
-   `https://enderbrosik.github.io/secretary/`, privacy policy `…/secretary/privacy/`, terms
-   `…/secretary/terms/`.
+   `https://getsecretary.vercel.app/`, privacy policy `…/privacy/`, terms
+   `…/terms/`, authorized domain `getsecretary.vercel.app`.
 3. **Clients → Create client → Desktop app.** A desktop client accepts any loopback port, so
    sign-in keeps working even if port 47821 is taken. (A *Web application* client with the
    redirect URI `http://127.0.0.1:47821/api/integrations/callback/google` also works, but only
@@ -76,7 +76,7 @@ users see "unverified", and some work or school accounts need an administrator's
 
 1. api.slack.com/apps → **Create New App → From a manifest**, using the manifest in
    `apps/web/src/components/settings/ProviderSetup.tsx`, plus under `oauth_config`:
-   `redirect_urls: [https://enderbrosik.github.io/secretary/oauth/]`.
+   `redirect_urls: [https://getsecretary.vercel.app/oauth/]`.
 2. **Manage Distribution → Activate Public Distribution**, so people outside your workspace
    can install it.
 3. Copy the Client ID and Client Secret from **Basic Information**.
@@ -84,5 +84,5 @@ users see "unverified", and some work or school accounts need an administrator's
 ## 5. Todoist
 
 1. developer.todoist.com/appconsole → **Create a new app**.
-2. **OAuth redirect URL:** `https://enderbrosik.github.io/secretary/oauth/`.
+2. **OAuth redirect URL:** `https://getsecretary.vercel.app/oauth/`.
 3. Copy the Client ID and Client secret.

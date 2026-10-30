@@ -20,7 +20,7 @@ export interface LegalDoc {
 }
 
 export const REPO_URL = 'https://github.com/enderbrosik/secretary';
-export const PUBLIC_SITE = 'https://enderbrosik.github.io/secretary';
+export const PUBLIC_SITE = 'https://getsecretary.vercel.app';
 const CONTACT = `[open an issue on GitHub](${REPO_URL}/issues)`;
 
 export const privacyPolicy: LegalDoc = {

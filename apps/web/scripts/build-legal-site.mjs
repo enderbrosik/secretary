@@ -39,6 +39,7 @@ const page = ({ title, description, body }) => `<!doctype html>
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
 <meta name="google-site-verification" content="qp3jJ7CWbBIWPUD3RbLWCkW6IrKKnFZhPODiFTqVDvU">
+<meta name="google-site-verification" content="fi9TtZTXdhkEX0mJRlWbO9i02r8qJ_KQm2XHzNo9m0E">
 <link rel="icon" href="${base}/favicon.svg" type="image/svg+xml">
 <style>${CSS}</style>
 </head>

@@ -1,8 +1,7 @@
 name: Legal pages
-
-# Publishes the Privacy Policy and Terms of Service to GitHub Pages:
-#   https://enderbrosik.github.io/secretary/privacy/
-#   https://enderbrosik.github.io/secretary/terms/
+# Publishes a mirror of the public site to GitHub Pages (enderbrosik.github.io/secretary).
+# The main site is https://getsecretary.vercel.app, built by Vercel from vercel.json; Google
+# only accepts that one for app verification.
 on:
   push:
     branches: [main]
