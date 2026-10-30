@@ -72,20 +72,65 @@ ${sections}
   await writeFile(join(out, doc.slug, 'index.html'), page({ title: `${doc.title} · Secretary`, description: `Secretary ${doc.title}`, body }));
 }
 
+// Homepage: what the app does and how it uses data (Google's consent screen links here).
+const HOME_CSS = `.home main{max-width:60rem}.hero{display:grid;gap:28px;align-items:center;margin:8px 0 56px}
+@media (min-width:760px){.hero{grid-template-columns:1.2fr 1fr}.logo{max-width:260px}}
+.hero h1{font-size:44px;line-height:1.1}.lede{font-size:17px;margin:16px 0 24px}
+.btns{display:flex;flex-wrap:wrap;gap:10px}.btn{display:inline-block;padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;text-decoration:none;border:1px solid var(--line);color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.logo{width:100%;max-width:160px;justify-self:center;border-radius:22%;box-shadow:0 20px 60px -20px rgba(47,75,184,.55)}
+.grid{display:grid;gap:12px}@media (min-width:640px){.grid{grid-template-columns:1fr 1fr}}@media (min-width:900px){.grid.three{grid-template-columns:1fr 1fr 1fr}}
+.feat{padding:18px;border:1px solid var(--line);border-radius:14px}.feat h3{margin:0 0 6px;font-size:15px;color:var(--ink)}.feat p{margin:0;font-size:14px}
+section{margin-top:52px}.kicker+h2{margin-top:0}.kicker{font-size:12.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 4px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.chip{padding:6px 12px;border:1px solid var(--line);border-radius:999px;font-size:13.5px;color:var(--ink)}`;
+const feat = (t, d) => `<div class="feat"><h3>${t}</h3><p>${d}</p></div>`;
 await writeFile(
   join(out, 'index.html'),
   page({
-    title: 'Secretary',
-    description: 'Secretary — an AI personal secretary that runs on your own computer.',
-    body: `<nav>${brand}<a href="${REPO_URL}">GitHub</a></nav>
-<h1>Secretary</h1>
-<p>A personal assistant that prepares a calm morning briefing, finds what needs a reply, prepares your meetings and writes an honest end-of-day review — using only the accounts you connect, and nothing sent or changed without your approval.</p>
-<div class="cards">
-<a class="card" href="${base}/privacy/">Privacy Policy<span>What Secretary stores, where, and who it is shared with.</span></a>
-<a class="card" href="${base}/terms/">Terms of Service<span>The terms for using the app.</span></a>
-<a class="card" href="${REPO_URL}">Source code &amp; downloads<span>github.com/enderbrosik/secretary</span></a>
-</div>`,
-  }),
+    title: 'Secretary — your AI personal secretary',
+    description: 'Secretary prepares a calm morning briefing, finds what needs a reply, preps your meetings and writes an honest end-of-day review. It runs on your own computer.',
+    body: `<nav>${brand}<span><a href="${base}/privacy/">Privacy</a> · <a href="${base}/terms/">Terms</a> · <a href="${REPO_URL}">GitHub</a></span></nav>
+<div class="hero">
+<div>
+<h1>Start every day knowing exactly what matters.</h1>
+<p class="lede">Secretary is a personal assistant for your calendar, email, messages and tasks. It prepares a calm morning briefing, tells you which emails need a reply, preps your meetings and writes an honest end-of-day review — and it never sends or changes anything without your approval.</p>
+<div class="btns"><a class="btn primary" href="${REPO_URL}">Get Secretary</a><a class="btn" href="${base}/privacy/">How your data is handled</a></div>
+</div>
+<img class="logo" src="${base}/logo.png" alt="Secretary logo" width="260" height="260">
+</div>
+
+<section>
+<p class="kicker">What it does</p>
+<h2>Your day, organized before you sit down</h2>
+<div class="grid three">
+${feat('Morning briefing', 'Your meetings, deadlines and the few things that matter most today, with a suggested plan you can review before anything goes on your calendar.')}
+${feat('Inbox that knows what needs you', 'Finds emails and Slack messages waiting for your reply, and drafts answers you can edit and approve.')}
+${feat('Meeting prep', 'Who’s attending, the related emails and open tasks — gathered for each meeting.')}
+${feat('One task list', 'Tasks from Todoist and your own, plus tasks suggested from your email — added only when you confirm them.')}
+${feat('End-of-day review', 'What got done, what moved, and what to prepare for tomorrow. Clearly separates facts from guesses, and you can correct it.')}
+${feat('Ask anything', 'Chat with an assistant that answers from your own calendar, email and tasks, with links to the sources.')}
+</div>
+</section>
+
+<section>
+<p class="kicker">Works with</p>
+<h2>The accounts you already use</h2>
+<div class="chips"><span class="chip">Gmail</span><span class="chip">Google Calendar</span><span class="chip">Outlook &amp; Microsoft 365</span><span class="chip">Slack</span><span class="chip">Todoist</span></div>
+<p>You connect each account with the provider’s own sign-in and choose what Secretary can access. Read-only is the default.</p>
+</section>
+
+<section>
+<p class="kicker">Privacy</p>
+<h2>Your data stays yours</h2>
+<div class="grid">
+${feat('Runs on your computer', 'Your emails, calendar and tasks are stored on your own device, encrypted. There are no Secretary servers holding your data.')}
+${feat('You choose the AI', 'Use free local AI that never leaves your computer, or your own OpenAI or Anthropic account.')}
+${feat('Nothing happens without you', 'Every email sent, draft saved or event created needs your approval first.')}
+${feat('No ads, no tracking', 'Your data is never sold, never used for ads and never used to train AI models. Delete it any time.')}
+</div>
+<p>Read the full <a href="${base}/privacy/">Privacy Policy</a>, including how Secretary uses Google user data, and the <a href="${base}/terms/">Terms of Service</a>.</p>
+</section>`,
+  }).replace('<body>', '<body class="home">').replace('</style>', `${HOME_CSS}</style>`),
 );
 // OAuth relay for the desktop app: Slack and Todoist only redirect to HTTPS, so their
 // consent screens return here and this page forwards the result to the app's loopback
