@@ -10,6 +10,7 @@ on:
       - apps/web/scripts/build-legal-site.mjs
       - apps/web/public/favicon.svg
       - brand/**
+      - apps/web/site-static/**
       - .github/workflows/pages.yml
   workflow_dispatch:
 

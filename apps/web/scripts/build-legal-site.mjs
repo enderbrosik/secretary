@@ -1,6 +1,6 @@
 // Builds the public Privacy Policy / Terms website (GitHub Pages) from src/legal/content.ts.
 // Usage: node scripts/build-legal-site.mjs <outDir> [basePath]   e.g. basePath "/secretary"
-import { copyFile, mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -57,6 +57,8 @@ const brand = `<a class="brand" href="${base}/"><img src="${base}/favicon.svg" a
 await mkdir(out, { recursive: true });
 await copyFile(join(here, '../public/favicon.svg'), join(out, 'favicon.svg'));
 await copyFile(join(here, '../../../brand/secretary-logo-512.png'), join(out, 'logo.png'));
+// Files served as-is at the site root (e.g. Google Search Console verification files).
+await cp(join(here, '../site-static'), out, { recursive: true });
 
 for (const doc of Object.values(legalDocs)) {
   const other = doc.slug === 'privacy' ? legalDocs.terms : legalDocs.privacy;
