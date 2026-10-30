@@ -79,6 +79,26 @@ fn master_key_with_timeout(store: &SecretStore) -> Result<String, String> {
     })
 }
 
+/// A server left over from an earlier run (crash, force quit, update) keeps the database
+/// busy, so the new one would never become ready. Stop it if it's still ours.
+fn stop_leftover_server(pid_file: &Path, log: &mut std::fs::File) {
+    let Some(pid) = std::fs::read_to_string(pid_file).ok().and_then(|s| s.trim().parse::<u32>().ok()) else { return };
+    let _ = std::fs::remove_file(pid_file);
+    #[cfg(unix)]
+    let ours = Command::new("ps").args(["-p", &pid.to_string(), "-o", "comm="]).output().map(|o| String::from_utf8_lossy(&o.stdout).contains("secretary-node")).unwrap_or(false);
+    #[cfg(windows)]
+    let ours = Command::new("tasklist").args(["/FI", &format!("PID eq {pid}"), "/NH"]).output().map(|o| String::from_utf8_lossy(&o.stdout).contains("secretary-node")).unwrap_or(false);
+    if !ours {
+        return;
+    }
+    let _ = writeln!(log, "stopping a leftover server from an earlier run (pid {pid})");
+    #[cfg(unix)]
+    let _ = Command::new("kill").arg(pid.to_string()).status();
+    #[cfg(windows)]
+    let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).status();
+    std::thread::sleep(Duration::from_millis(1500));
+}
+
 /// Last lines of the server log, included in startup errors so problems are diagnosable.
 fn log_tail(log: &Path, lines: usize) -> String {
     let text = std::fs::read_to_string(log).unwrap_or_default();
@@ -104,6 +124,8 @@ pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, extra_en
     let url = format!("http://127.0.0.1:{port}");
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     let db = data_dir.join("db");
+    let pid_file = data_dir.join("server.pid");
+    stop_leftover_server(&pid_file, &mut log);
     let _ = writeln!(log, "reading the encryption key from the system keychain");
     let key = master_key_with_timeout(store)?;
     let _ = writeln!(log, "encryption key ready");
@@ -140,11 +162,13 @@ pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, extra_en
         .env("DATABASE_URL", format!("pglite://{}", db.display()))
         .env("MIGRATIONS_DIR", server_dir.join("migrations"))
         .env("MASTER_KEY", &key)
+        .env("SECRETARY_PARENT_PID", std::process::id().to_string())
         .env("LOG_LEVEL", "warn")
         .stdout(Stdio::piped())
         .stderr(Stdio::from(log.try_clone().map_err(|e| e.to_string())?))
         .spawn()
         .map_err(|e| format!("Could not start the local server: {e}"))?;
+    let _ = std::fs::write(&pid_file, child.id().to_string());
 
     // Mirror stdout to the log and watch for the readiness line.
     let stdout = child.stdout.take().ok_or("no stdout")?;
