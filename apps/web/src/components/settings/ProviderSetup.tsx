@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { PUBLIC_SITE } from '../../legal/content';
 import { api, errorMessage } from '../../lib/api';
 import { openExternal } from '../../lib/platform';
 import type { ProviderInfo } from '../../lib/queries';
@@ -192,14 +193,19 @@ export function ProviderSetupDialog({ provider, onClose, onReady }: { provider: 
             Open the <Link href="https://console.cloud.google.com/auth/overview">Google Auth Platform</Link> and click <b>Get started</b>: app name <b>Secretary</b>, your email, Audience <b>External</b>.
           </Step>
           <Step n={4}>
-            Under <b>Audience</b>, click <b>Publish app</b> and confirm. (In “Testing” mode Google disconnects you every 7 days. Publishing a personal app is fine — you’ll just see an “unverified app” notice when signing in.)
+            Optional: under <b>Branding</b>, paste these links into <b>Application privacy policy link</b> and <b>Application terms of service link</b>, then <b>Save</b>.
+            <CopyBox label="Privacy policy" value={`${PUBLIC_SITE}/privacy/`} />
+            <CopyBox label="Terms of service" value={`${PUBLIC_SITE}/terms/`} />
           </Step>
           <Step n={5}>
+            Under <b>Audience</b>, click <b>Publish app</b> and confirm. (In “Testing” mode Google disconnects you every 7 days. Publishing a personal app is fine — you’ll just see an “unverified app” notice when signing in.)
+          </Step>
+          <Step n={6}>
             Under <b>Clients</b>, click <b>Create client</b> → type <b>Web application</b> → under <b>Authorized redirect URIs</b> click <b>Add URI</b> and paste:
             <CopyBox label="Redirect URI" value={redirect} />
             Click <b>Create</b>.
           </Step>
-          <Step n={6}>
+          <Step n={7}>
             Copy the <b>Client ID</b> and <b>Client secret</b> into the boxes below.
             {appFields('Client ID', 'Client secret')}
           </Step>

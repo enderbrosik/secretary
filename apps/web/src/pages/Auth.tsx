@@ -53,7 +53,16 @@ export function AuthPage({ mode, serverError }: { mode: 'login' | 'signup'; serv
             A calm morning briefing, an inbox that tells you what needs a reply, meeting prep, and an honest end-of-day review — powered by the AI provider you choose, using only the accounts you connect.
           </p>
         </div>
-        <p className="text-[12.5px] text-faint">Your API key, your accounts, your data. Nothing is sent or changed without your approval.</p>
+        <p className="text-[12.5px] text-faint">
+          Your API key, your accounts, your data. Nothing is sent or changed without your approval.{' '}
+          <Link to="/privacy" className="underline-offset-2 hover:text-ink hover:underline">
+            Privacy
+          </Link>
+          {' · '}
+          <Link to="/terms" className="underline-offset-2 hover:text-ink hover:underline">
+            Terms
+          </Link>
+        </p>
       </div>
       <div className="flex items-center justify-center p-6">
         <form onSubmit={submit} className="w-full max-w-sm">
@@ -98,6 +107,28 @@ export function AuthPage({ mode, serverError }: { mode: 'login' | 'signup'; serv
               )}
             </p>
           )}
+          {mode === 'signup' && (
+            <p className="mt-4 text-center text-[12px] text-faint">
+              By creating an account you agree to the{' '}
+              <Link to="/terms" className="text-muted hover:text-ink hover:underline">
+                Terms
+              </Link>{' '}
+              and{' '}
+              <Link to="/privacy" className="text-muted hover:text-ink hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          )}
+          <p className="mt-3 text-center text-[12px] text-faint lg:hidden">
+            <Link to="/privacy" className="hover:text-ink">
+              Privacy
+            </Link>
+            {' · '}
+            <Link to="/terms" className="hover:text-ink">
+              Terms
+            </Link>
+          </p>
           {isDesktop && (
             <p className="mt-3 text-center text-[12.5px]">
               <Link to="/desktop-setup" className="text-muted hover:text-ink">

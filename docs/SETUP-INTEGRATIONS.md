@@ -26,6 +26,9 @@ Raising the level later sends the user back through the provider's consent scree
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), create a project, then go to **APIs & Services → Library** and enable **Gmail API** and **Google Calendar API**.
 2. Go to **OAuth consent screen**: User type *External* (or *Internal* for Workspace), and add the scopes listed below.
+   Under **Branding**, the privacy policy and terms links can be
+   `https://enderbrosik.github.io/secretary/privacy/` and `https://enderbrosik.github.io/secretary/terms/`
+   (published by `.github/workflows/pages.yml` from `apps/web/src/legal/content.ts`; they are also in the app at `/privacy` and `/terms`).
 3. Go to **Credentials → Create credentials → OAuth client ID → Web application** and add the redirect URI `…/api/integrations/callback/google`.
 4. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 

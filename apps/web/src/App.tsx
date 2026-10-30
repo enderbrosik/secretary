@@ -22,6 +22,7 @@ const SettingsPage = lazy(() => import('./pages/Settings'));
 const OnboardingPage = lazy(() => import('./pages/Onboarding'));
 const QuickPage = lazy(() => import('./pages/Quick'));
 const DesktopSetupPage = lazy(() => import('./pages/DesktopSetup'));
+const LegalPage = lazy(() => import('./pages/Legal'));
 
 function FullScreenSpinner() {
   return (
@@ -45,6 +46,13 @@ function Gate() {
     });
   }, [qc, nav]);
 
+  // Privacy Policy and Terms are public pages, reachable whether or not you are signed in.
+  if (loc.pathname === '/privacy' || loc.pathname === '/terms')
+    return (
+      <Suspense fallback={<FullScreenSpinner />}>
+        <LegalPage doc={loc.pathname === '/privacy' ? 'privacy' : 'terms'} />
+      </Suspense>
+    );
   if (me.isLoading) return <FullScreenSpinner />;
   if (me.isError) {
     if (isDesktop) return <Suspense fallback={<FullScreenSpinner />}><DesktopSetupPage error={me.error} /></Suspense>;

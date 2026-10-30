@@ -160,6 +160,22 @@ export function PrivacySettings() {
         </div>
       </Card>
       <Card>
+        <CardHeader
+          title="Privacy Policy & Terms"
+          subtitle="How Secretary handles your data, and the terms for using it."
+          actions={
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => nav('/privacy')}>
+                Privacy Policy
+              </Button>
+              <Button size="sm" onClick={() => nav('/terms')}>
+                Terms
+              </Button>
+            </div>
+          }
+        />
+      </Card>
+      <Card>
         <CardHeader title="Your data" />
         <div className="flex flex-wrap gap-2 px-5 pb-5">
           <Button
