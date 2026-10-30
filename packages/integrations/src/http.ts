@@ -35,7 +35,7 @@ export async function request<T>(provider: string, url: string, opts: RequestOpt
     throw new IntegrationError('unavailable', `${provider} could not be reached`);
   }
   if (res.status === 401) throw new IntegrationError('auth_expired', `${provider} authorization expired or was revoked`);
-  if (res.status === 403) throw new IntegrationError('insufficient_scope', `${provider} denied access (missing permission)`);
+  if (res.status === 403) throw forbidden(provider, await res.text().catch(() => ''));
   if (res.status === 429) {
     const ra = Number(res.headers.get('retry-after'));
     throw new IntegrationError('rate_limited', `${provider} rate limit reached`, Number.isFinite(ra) ? ra : 60);
@@ -50,6 +50,18 @@ export async function request<T>(provider: string, url: string, opts: RequestOpt
   } catch {
     throw new IntegrationError('bad_response', `${provider} returned an unexpected response`);
   }
+}
+
+/**
+ * A 403 is not always a permission problem: Google also uses it for rate limits
+ * and for APIs that are not enabled in the developer project.
+ */
+function forbidden(provider: string, body: string): IntegrationError {
+  if (/rateLimitExceeded|userRateLimitExceeded|RATE_LIMIT_EXCEEDED|quotaExceeded|Too many concurrent/i.test(body))
+    return new IntegrationError('rate_limited', `${provider} rate limit reached`, 60);
+  if (/accessNotConfigured|SERVICE_DISABLED|has not been used in project|is disabled/i.test(body))
+    return new IntegrationError('config_missing', `The ${provider} API is not enabled for this app. Enable it in your developer console (for Google: APIs & Services → Library), wait a few minutes, then sync again.`);
+  return new IntegrationError('insufficient_scope', `${provider} denied access (missing permission). Reconnect the account and allow all requested access.`);
 }
 
 export function pkcePair(): { verifier: string; challenge: string } {

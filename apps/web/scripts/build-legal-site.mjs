@@ -54,6 +54,7 @@ const brand = `<a class="brand" href="${base}/"><img src="${base}/favicon.svg" a
 
 await mkdir(out, { recursive: true });
 await copyFile(join(here, '../public/favicon.svg'), join(out, 'favicon.svg'));
+await copyFile(join(here, '../../../brand/secretary-logo-512.png'), join(out, 'logo.png'));
 
 for (const doc of Object.values(legalDocs)) {
   const other = doc.slug === 'privacy' ? legalDocs.terms : legalDocs.privacy;

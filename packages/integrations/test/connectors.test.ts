@@ -115,6 +115,37 @@ describe('Google', () => {
     expect(r.replaceWindows[0]!.kind).toBe('event');
   });
 
+  it('tells rate limits and disabled APIs apart from missing permissions', async () => {
+    const cal = http.get('https://www.googleapis.com/calendar/v3/calendars/primary/events', () => HttpResponse.json({ items: [] }));
+    const gmail403 = (reason: string) =>
+      http.get('https://gmail.googleapis.com/gmail/v1/users/me/threads', () => HttpResponse.json({ error: { code: 403, errors: [{ reason }], message: reason } }, { status: 403 }));
+    const codeFor = async (reason: string) => {
+      server.use(cal, gmail403(reason));
+      return ((await googleConnector.sync(ctx()).catch((e) => e)) as IntegrationError).code;
+    };
+    expect(await codeFor('userRateLimitExceeded')).toBe('rate_limited');
+    expect(await codeFor('accessNotConfigured')).toBe('config_missing');
+    expect(await codeFor('insufficientPermissions')).toBe('insufficient_scope');
+  });
+
+  it('explains when Gmail access was unticked on the consent screen', async () => {
+    const scopes = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'];
+    const err = (await googleConnector.sync(ctx({ tokens: { ...ctx().tokens, scopes } })).catch((e) => e)) as IntegrationError;
+    expect(err.code).toBe('insufficient_scope');
+    expect(err.message).toMatch(/Gmail/);
+    expect(err.message).not.toMatch(/Calendar/);
+  });
+
+  it('skips a thread that disappears mid-sync', async () => {
+    server.use(
+      http.get('https://www.googleapis.com/calendar/v3/calendars/primary/events', () => HttpResponse.json({ items: [] })),
+      http.get('https://gmail.googleapis.com/gmail/v1/users/me/threads', () => HttpResponse.json({ threads: [{ id: 'gone' }] })),
+      http.get('https://gmail.googleapis.com/gmail/v1/users/me/threads/gone', () => HttpResponse.json({ error: { code: 404 } }, { status: 404 })),
+    );
+    const r = await googleConnector.sync(ctx());
+    expect(r.items.filter((i) => i.kind === 'email')).toHaveLength(0);
+  });
+
   it('builds RFC 822 messages without header injection', () => {
     const raw = buildRfc822('me@example.com', { to: ['a@x.com\r\nBcc: evil@x.com'], subject: 'Hi\r\nBcc: evil@x.com', body: 'Body' });
     const text = Buffer.from(raw, 'base64url').toString();

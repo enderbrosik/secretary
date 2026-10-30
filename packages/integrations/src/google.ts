@@ -121,6 +121,13 @@ export const googleConnector: Connector = {
   async sync(ctx: SyncContext): Promise<SyncResult> {
     const items: NewItem[] = [];
     const replaceWindows: SyncResult['replaceWindows'] = [];
+    // Google's consent screen lets people untick individual permissions.
+    const granted = ctx.tokens.scopes;
+    if (granted.length) {
+      const missing = [ctx.features.email && !granted.some((g) => g === S.gmailRead || g === S.gmailCompose) && 'Gmail', ctx.features.calendar && !granted.some((g) => g === S.calRead || g === S.calEvents) && 'Google Calendar'].filter(Boolean);
+      if (missing.length)
+        throw new IntegrationError('insufficient_scope', `Google didn’t grant access to ${missing.join(' and ')}. Reconnect and tick every box on Google’s permission screen.`);
+    }
     if (ctx.features.calendar) {
       const from = DateTime.fromJSDate(ctx.now).setZone(ctx.timezone).startOf('day').minus({ days: 1 });
       const to = from.plus({ days: 9 });
@@ -300,14 +307,19 @@ async function syncGmail(ctx: SyncContext): Promise<NewItem[]> {
     query: { q: 'in:inbox newer_than:7d -in:chats', maxResults: 40 },
   });
   const ids = (list.threads ?? []).map((t) => t.id);
-  const threads = await mapLimit(ids, 5, (id) =>
+  const fetched = await mapLimit(ids, 3, (id) =>
     request<GThread>('Gmail', `${GMAIL}/threads/${id}`, {
       token: ctx.tokens.accessToken,
       query: ctx.includeBodies ? { format: 'full' } : { format: 'metadata' },
+    }).catch((e) => {
+      // A thread deleted between listing and fetching shouldn't fail the whole sync.
+      if (e instanceof IntegrationError && e.code === 'bad_response') return null;
+      throw e;
     }),
   );
   const out: NewItem[] = [];
-  for (const th of threads) {
+  for (const th of fetched) {
+    if (!th) continue;
     const msgs = th.messages ?? [];
     const last = msgs[msgs.length - 1];
     if (!last) continue;

@@ -26,6 +26,7 @@ export async function createSession(deps: Deps, userId: string, client: 'web' | 
     csrfToken,
     userAgent: (req.headers['user-agent'] ?? '').slice(0, 300),
     ip: req.ip,
+    lastSeenAt: deps.now().toISOString(),
     expiresAt,
   });
   // Opportunistic cleanup of expired sessions for this user.
