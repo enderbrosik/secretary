@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { dailyJobDue, localDate } from '@secretary/core';
 import { schema } from '@secretary/db';
 import { getConnector } from '@secretary/integrations';
-import { oauthCredentials } from '../config.js';
+import { getOAuthCredentials } from '../services/oauth-apps.js';
 import type { Deps } from '../lib/context.js';
 import { requireUser, revokeSessions, SESSION_COOKIE } from '../lib/auth.js';
 import { verifyPassword } from '../lib/crypto.js';
@@ -106,7 +106,7 @@ export async function systemRoutes(app: FastifyInstance, deps: Deps) {
     for (const c of conns) {
       const connector = getConnector(c.provider);
       if (c.encryptedTokens && connector?.revoke) {
-        await connector.revoke(JSON.parse(deps.keys.decrypt(user, tokenPurpose(c), c.encryptedTokens)), oauthCredentials(deps.config, c.provider) ?? { clientId: '', clientSecret: '' }).catch(() => undefined);
+        await connector.revoke(JSON.parse(deps.keys.decrypt(user, tokenPurpose(c), c.encryptedTokens)), (await getOAuthCredentials(deps, c.provider)) ?? { clientId: '', clientSecret: '' }).catch(() => undefined);
       }
     }
     await revokeSessions(deps, user.id);

@@ -86,6 +86,27 @@ export const slackConnector: Connector = {
     };
   },
 
+  /** A user token (xoxp-…) from an app the user installed in their own workspace. */
+  async connectWithToken(token) {
+    if (token.startsWith('xoxb-')) throw new IntegrationError('bad_response', 'That’s a bot token (xoxb-). Copy the “User OAuth Token” (starts with xoxp-) instead — bot tokens can’t see your direct messages.');
+    if (!token.startsWith('xoxp-')) throw new IntegrationError('bad_response', 'Slack user tokens start with “xoxp-”. Copy the “User OAuth Token” from your Slack app’s OAuth & Permissions page.');
+    let res: Response;
+    try {
+      res = await fetch(`${API}/auth.test`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20_000) });
+    } catch {
+      throw new IntegrationError('unavailable', 'Slack could not be reached');
+    }
+    const auth = (await res.json().catch(() => ({ ok: false }))) as SlackResp & { url?: string; user?: string; user_id?: string; team?: string; team_id?: string };
+    if (!auth.ok || !auth.user_id) throw new IntegrationError('auth_expired', 'Slack rejected that token. Check you copied the whole User OAuth Token.');
+    const granted = (res.headers.get('x-oauth-scopes') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+    const missing = USER_SCOPES.filter((sc) => granted.length && !granted.includes(sc));
+    if (missing.length) throw new IntegrationError('insufficient_scope', `The Slack app is missing these User Token Scopes: ${missing.join(', ')}. Add them, reinstall the app, then copy the new token.`);
+    return {
+      tokens: { accessToken: token, refreshToken: null, expiresAt: null, scopes: granted.length ? granted : USER_SCOPES, extra: { userId: auth.user_id, teamId: auth.team_id ?? '', teamUrl: auth.url ?? '' } },
+      account: { externalId: `${auth.team_id}:${auth.user_id}`, label: `${auth.team ?? 'Slack'} (${auth.user ?? 'you'})`, email: null },
+    };
+  },
+
   async refresh(tokens, creds) {
     // Only applies when token rotation is enabled on the Slack app.
     if (!tokens.refreshToken) return tokens;

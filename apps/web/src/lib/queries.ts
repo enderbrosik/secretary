@@ -82,6 +82,9 @@ export interface ProviderInfo {
   name: string;
   supports: Connection['features'];
   configured: boolean;
+  appSource: 'env' | 'app' | null;
+  canConfigureApp: boolean;
+  tokenConnect: boolean;
   setupDoc: string | null;
   redirectUri: string | null;
 }

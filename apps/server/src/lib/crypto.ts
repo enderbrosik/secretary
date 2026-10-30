@@ -53,6 +53,15 @@ export class KeyRing {
     return open(this.dek(user.id, user.wrappedDataKey), token, `${user.id}:${purpose}`).toString('utf8');
   }
 
+  /** For server-level secrets (e.g. OAuth app client secrets), encrypted directly with the master key. */
+  encryptSystem(purpose: string, plaintext: string): string {
+    return seal(this.masterKey, Buffer.from(plaintext, 'utf8'), `system:${purpose}`);
+  }
+
+  decryptSystem(purpose: string, token: string): string {
+    return open(this.masterKey, token, `system:${purpose}`).toString('utf8');
+  }
+
   forget(userId: string) {
     this.cache.delete(userId);
   }

@@ -2,6 +2,7 @@ import { DateTime } from 'luxon';
 import type { TaskPriority } from '@secretary/core';
 import { request } from './http.js';
 import type { Connector, ExternalTask, SyncContext, SyncResult } from './types.js';
+import { IntegrationError } from './types.js';
 
 const API = 'https://api.todoist.com/api/v1';
 
@@ -81,7 +82,21 @@ export const todoistConnector: Connector = {
     };
   },
 
+  /** Personal API token from Todoist → Settings → Integrations → Developer. */
+  async connectWithToken(token) {
+    if (!/^[a-f0-9]{40}$/i.test(token)) throw new IntegrationError('bad_response', 'Todoist API tokens are 40 letters and numbers. Copy it from Todoist → Settings → Integrations → Developer.');
+    const me = await request<{ id: string; email?: string; full_name?: string }>('Todoist', `${API}/user`, { token }).catch((e) => {
+      if (e instanceof IntegrationError && (e.code === 'auth_expired' || e.code === 'insufficient_scope')) throw new IntegrationError('auth_expired', 'Todoist rejected that token. Copy it again from Settings → Integrations → Developer.');
+      throw e;
+    });
+    return {
+      tokens: { accessToken: token, refreshToken: null, expiresAt: null, scopes: ['personal_token'], extra: { personal: '1' } },
+      account: { externalId: String(me.id), label: me.email ?? me.full_name ?? 'Todoist', email: me.email ?? null },
+    };
+  },
+
   async revoke(tokens, creds) {
+    if (tokens.extra?.personal) return; // personal tokens are managed in Todoist’s settings
     await request('Todoist', `${API}/access_tokens`, {
       method: 'DELETE',
       query: { client_id: creds.clientId, client_secret: creds.clientSecret, access_token: tokens.accessToken },

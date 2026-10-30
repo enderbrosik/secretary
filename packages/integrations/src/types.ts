@@ -112,6 +112,8 @@ export interface Connector {
   describeScopes(features: Features, tier: Tier): { scope: string; why: string }[];
   buildAuthUrl(p: { creds: ClientCredentials; redirectUri: string; state: string; codeChallenge: string; scopes: string[] }): string;
   exchangeCode(p: { creds: ClientCredentials; code: string; codeVerifier: string; redirectUri: string }): Promise<{ tokens: TokenSet; account: AccountInfo }>;
+  /** Alternative to OAuth: connect with a token the user created in the provider (verified first). */
+  connectWithToken?(token: string): Promise<{ tokens: TokenSet; account: AccountInfo }>;
   refresh?(tokens: TokenSet, creds: ClientCredentials): Promise<TokenSet>;
   revoke?(tokens: TokenSet, creds: ClientCredentials): Promise<void>;
   sync(ctx: SyncContext): Promise<SyncResult>;

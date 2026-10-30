@@ -386,3 +386,15 @@ export const auditLog = pgTable(
   },
   (t) => [index('audit_user_time_idx').on(t.userId, t.createdAt)],
 );
+
+/**
+ * OAuth app registrations entered in the app (desktop local mode only; hosted servers use env vars).
+ * The client secret is encrypted with the server master key.
+ */
+export const oauthApps = pgTable('oauth_apps', {
+  provider: text('provider').primaryKey(),
+  clientId: text('client_id').notNull(),
+  encryptedSecret: text('encrypted_secret').notNull(),
+  tenant: text('tenant'),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+});

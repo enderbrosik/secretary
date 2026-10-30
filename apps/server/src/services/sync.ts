@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import { fingerprint, formatTime, localDate } from '@secretary/core';
 import { schema } from '@secretary/db';
 import { getConnector, IntegrationError, type ExternalTask, type NewItem, type SyncContext, type TokenSet } from '@secretary/integrations';
-import { oauthCredentials } from '../config.js';
+import { getOAuthCredentials } from './oauth-apps.js';
 import type { AuthedUser, Deps } from '../lib/context.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { getSettings } from './settings.js';
@@ -33,7 +33,7 @@ export async function connectionContext(deps: Deps, user: AuthedUser, conn: Conn
     : { accessToken: '', refreshToken: null, expiresAt: null, scopes: [], extra: {} };
   const connector = getConnector(conn.provider)!;
   if (tokens.expiresAt && Date.parse(tokens.expiresAt) - deps.now().getTime() < 120_000 && connector.refresh) {
-    const creds = oauthCredentials(deps.config, conn.provider);
+    const creds = await getOAuthCredentials(deps, conn.provider);
     if (!creds) throw new IntegrationError('config_missing', `${connector.name} is not configured on this server`);
     tokens = await connector.refresh(tokens, creds);
     await deps.db

@@ -8,6 +8,7 @@ import { fmtRelative } from '../../lib/format';
 import { isDesktop, openExternal } from '../../lib/platform';
 import { useApiMutation, useIntegrations, type Connection, type ProviderInfo } from '../../lib/queries';
 import { Badge, Banner, Button, Card, CardHeader, Checkbox, Dialog, Spinner, type Tone } from '../../ui';
+import { ProviderSetupDialog } from './ProviderSetup';
 
 type Tier = 'read' | 'draft' | 'write';
 const TIER_LABEL: Record<Tier, string> = { read: 'Read only', draft: 'Read + drafts', write: 'Send & make changes' };
@@ -28,6 +29,7 @@ export function IntegrationSettings({ compact }: { compact?: boolean }) {
   const [params, setParams] = useSearchParams();
   const qc = useQueryClient();
   const [connecting, setConnecting] = useState<ProviderInfo | null>(null);
+  const [settingUp, setSettingUp] = useState<ProviderInfo | null>(null);
 
   useEffect(() => {
     const ok = params.get('connected');
@@ -74,10 +76,28 @@ export function IntegrationSettings({ compact }: { compact?: boolean }) {
                 ))}
               </div>
               <div className="mt-auto pt-3">
-                {p.configured ? (
-                  <Button size="sm" onClick={() => setConnecting(p)}>
+                {p.tokenConnect ? (
+                  <Button size="sm" onClick={() => setSettingUp(p)}>
                     Connect
                   </Button>
+                ) : p.configured ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" onClick={() => setConnecting(p)}>
+                      Connect
+                    </Button>
+                    {p.appSource === 'app' && (
+                      <button className="text-[12px] text-faint hover:text-muted" onClick={() => setSettingUp(p)}>
+                        Change app settings
+                      </button>
+                    )}
+                  </div>
+                ) : p.canConfigureApp ? (
+                  <div className="flex flex-col items-start gap-1.5">
+                    <Button size="sm" onClick={() => setSettingUp(p)}>
+                      Set up
+                    </Button>
+                    <span className="text-[12px] text-muted">One-time, about 5–10 minutes.</span>
+                  </div>
                 ) : (
                   <div className="text-[12.5px] text-muted">
                     <p>Not available on this server yet — it needs {p.name.split(' ')[0]} app credentials.</p>
@@ -103,6 +123,17 @@ export function IntegrationSettings({ compact }: { compact?: boolean }) {
         </Card>
       )}
       {connecting && <ConnectDialog provider={connecting} onClose={() => setConnecting(null)} />}
+      {settingUp && (
+        <ProviderSetupDialog
+          provider={settingUp}
+          onClose={() => setSettingUp(null)}
+          onReady={() => {
+            const p = settingUp;
+            setSettingUp(null);
+            setConnecting({ ...p, configured: true });
+          }}
+        />
+      )}
     </div>
   );
 }

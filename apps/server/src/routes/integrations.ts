@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { PERMISSION_TIERS } from '@secretary/core';
 import { schema } from '@secretary/db';
 import { CONNECTORS, getConnector, IntegrationError, pkcePair, type Features } from '@secretary/integrations';
-import { oauthCredentials } from '../config.js';
+import { deleteOAuthApp, getOAuthCredentials, saveOAuthApp } from '../services/oauth-apps.js';
 import type { Deps } from '../lib/context.js';
 import { requireUser } from '../lib/auth.js';
 import { randomToken } from '../lib/crypto.js';
@@ -33,15 +33,25 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
   app.get('/api/integrations', async (req) => {
     const user = requireUser(req);
     const conns = await deps.db.select().from(schema.connections).where(eq(schema.connections.userId, user.id));
+    const providers = await Promise.all(
+      Object.values(CONNECTORS).map(async (c) => {
+        const creds = c.provider === 'demo' ? null : await getOAuthCredentials(deps, c.provider);
+        return {
+          provider: c.provider,
+          name: c.name,
+          supports: c.supports,
+          configured: c.provider === 'demo' ? deps.config.ALLOW_DEMO : !!creds,
+          appSource: creds?.source ?? null,
+          // In desktop local mode the user can register their own OAuth app in Settings.
+          canConfigureApp: deps.config.LOCAL_MODE && c.provider !== 'demo' && creds?.source !== 'env',
+          tokenConnect: !!c.connectWithToken,
+          setupDoc: PROVIDER_DOCS[c.provider] ?? null,
+          redirectUri: c.provider === 'demo' ? null : redirectUri(c.provider),
+        };
+      }),
+    );
     return {
-      providers: Object.values(CONNECTORS).map((c) => ({
-        provider: c.provider,
-        name: c.name,
-        supports: c.supports,
-        configured: c.provider === 'demo' ? deps.config.ALLOW_DEMO : !!oauthCredentials(deps.config, c.provider),
-        setupDoc: PROVIDER_DOCS[c.provider] ?? null,
-        redirectUri: c.provider === 'demo' ? null : redirectUri(c.provider),
-      })),
+      providers,
       connections: conns.map((c) => ({
         id: c.id,
         provider: c.provider,
@@ -57,6 +67,74 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
         createdAt: c.createdAt,
       })),
     };
+  });
+
+  /** Desktop local mode: save the user's own OAuth app registration for a provider. */
+  app.put<{ Params: { provider: string } }>('/api/integrations/:provider/app', async (req) => {
+    const user = requireUser(req);
+    const connector = getConnector(req.params.provider);
+    if (!connector || connector.provider === 'demo') throw notFound('Integration');
+    if (!deps.config.LOCAL_MODE) throw forbidden('OAuth apps are configured by the server administrator on hosted servers.');
+    const body = parse(
+      z.object({
+        clientId: z.string().trim().min(8).max(300).regex(/^[\w.\-:@]+$/, 'That doesn’t look like a client ID'),
+        clientSecret: z.string().trim().min(8).max(500),
+        tenant: z.string().trim().max(100).regex(/^[\w.-]+$/).optional(),
+      }),
+      req.body,
+    );
+    await saveOAuthApp(deps, connector.provider, body);
+    await audit(deps, user.id, 'integration.app_configured', { detail: { provider: connector.provider } });
+    return { ok: true };
+  });
+
+  app.delete<{ Params: { provider: string } }>('/api/integrations/:provider/app', async (req) => {
+    const user = requireUser(req);
+    if (!deps.config.LOCAL_MODE) throw forbidden('Not available on hosted servers');
+    await deleteOAuthApp(deps, req.params.provider);
+    await audit(deps, user.id, 'integration.app_removed', { detail: { provider: req.params.provider } });
+    return { ok: true };
+  });
+
+  /**
+   * Connect with a token the user created in the provider itself (Slack user token, Todoist
+   * API token). The token is verified with the provider, then stored encrypted like OAuth tokens.
+   */
+  app.post<{ Params: { provider: string } }>('/api/integrations/:provider/token', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    const user = requireUser(req);
+    const connector = getConnector(req.params.provider);
+    if (!connector?.connectWithToken) throw notFound('Token connection');
+    const body = parse(z.object({ token: z.string().trim().min(10).max(500), tier: z.enum(PERMISSION_TIERS).default('read') }), req.body);
+    let result;
+    try {
+      result = await connector.connectWithToken(body.token);
+    } catch (e) {
+      if (e instanceof IntegrationError) throw new AppError(400, `integration_${e.code}`, e.message);
+      throw e;
+    }
+    const features = connector.supports;
+    const purpose = tokenPurpose({ provider: connector.provider, externalAccountId: result.account.externalId });
+    const values = {
+      userId: user.id,
+      provider: connector.provider,
+      externalAccountId: result.account.externalId,
+      accountLabel: result.account.label,
+      scopes: result.tokens.scopes,
+      tier: connector.provider === 'slack' ? ('read' as const) : body.tier,
+      features,
+      encryptedTokens: deps.keys.encrypt(user, purpose, JSON.stringify(result.tokens)),
+      tokenExpiresAt: result.tokens.expiresAt,
+      status: 'active' as const,
+      lastSyncError: null,
+    };
+    const [conn] = await deps.db
+      .insert(schema.connections)
+      .values(values)
+      .onConflictDoUpdate({ target: [schema.connections.userId, schema.connections.provider, schema.connections.externalAccountId], set: values })
+      .returning();
+    await audit(deps, user.id, 'integration.connected', { target: conn!.id, detail: { provider: connector.provider, method: 'token', tier: values.tier } });
+    void syncConnection(deps, user.id, conn!.id).catch((e) => deps.log.warn({ err: e, provider: connector.provider }, 'initial sync failed'));
+    return { connected: true, connectionId: conn!.id, accountLabel: result.account.label };
   });
 
   /** Preview of exactly which permissions will be requested — shown before redirecting to the provider. */
@@ -89,9 +167,9 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
       return { connected: true, connectionId: conn!.id };
     }
 
-    const creds = oauthCredentials(deps.config, connector.provider);
+    const creds = await getOAuthCredentials(deps, connector.provider);
     if (!creds) {
-      throw new AppError(409, 'integration_not_configured', `${connector.name} isn't configured on this server yet. An administrator needs to register an OAuth app and set its client ID and secret (see ${PROVIDER_DOCS[connector.provider]}).`);
+      throw new AppError(409, 'integration_not_configured', deps.config.LOCAL_MODE ? `${connector.name} needs a one-time setup first. Click “Set up” next to it in Settings → Integrations.` : `${connector.name} isn't configured on this server yet. An administrator needs to register an OAuth app and set its client ID and secret (see ${PROVIDER_DOCS[connector.provider]}).`);
     }
     const state = randomToken(24);
     const { verifier, challenge } = pkcePair();
@@ -132,7 +210,7 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
     if (q.error) return finish(false, q.error === 'access_denied' ? 'You declined the permission request. Nothing was connected.' : 'The provider returned an error. Nothing was connected.', st.returnTo);
     if (!q.code) return finish(false, 'Missing authorization code.', st.returnTo);
     const connector = getConnector(st.provider)!;
-    const creds = oauthCredentials(deps.config, st.provider);
+    const creds = await getOAuthCredentials(deps, st.provider);
     if (!creds) return finish(false, 'Integration not configured on server.', st.returnTo);
     const user = await loadUser(deps, st.userId);
     try {
@@ -180,7 +258,8 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
     const short = (x: string) => x.split('/').pop()!.toLowerCase();
     const granted = new Set(conn.scopes.map(short));
     const missing = needed.filter((x) => !IDENTITY.has(x) && !granted.has(short(x)));
-    if (missing.length && conn.provider !== 'demo') {
+    // Personal tokens (Todoist) already carry full access; there is no consent screen to revisit.
+    if (missing.length && conn.provider !== 'demo' && !conn.scopes.includes('personal_token')) {
       // Broader access requires going back through the provider's consent screen.
       return { requiresReconsent: true, missingScopes: missing };
     }
@@ -207,7 +286,7 @@ export async function integrationRoutes(app: FastifyInstance, deps: Deps) {
     const connector = getConnector(conn.provider)!;
     let revoked = false;
     if (conn.encryptedTokens && connector.revoke) {
-      const creds = oauthCredentials(deps.config, conn.provider);
+      const creds = await getOAuthCredentials(deps, conn.provider);
       try {
         await connector.revoke(JSON.parse(deps.keys.decrypt(user, tokenPurpose(conn), conn.encryptedTokens)), creds ?? { clientId: '', clientSecret: '' });
         revoked = true;
