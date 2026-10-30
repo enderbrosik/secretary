@@ -38,6 +38,7 @@ const page = ({ title, description, body }) => `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
+<meta name="google-site-verification" content="qp3jJ7CWbBIWPUD3RbLWCkW6IrKKnFZhPODiFTqVDvU">
 <link rel="icon" href="${base}/favicon.svg" type="image/svg+xml">
 <style>${CSS}</style>
 </head>
