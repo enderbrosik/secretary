@@ -66,6 +66,19 @@ fn master_key(store: &SecretStore) -> Result<String, String> {
     Ok(k)
 }
 
+/// The keychain can block while macOS waits for the user to allow access (each unsigned
+/// build counts as a new app). Give up with an explanation instead of hanging on the splash.
+fn master_key_with_timeout(store: &SecretStore) -> Result<String, String> {
+    let (tx, rx) = mpsc::channel();
+    let store = store.clone();
+    std::thread::spawn(move || {
+        let _ = tx.send(master_key(&store));
+    });
+    rx.recv_timeout(Duration::from_secs(45)).unwrap_or_else(|_| {
+        Err("The system keychain didn’t answer. Look for a Keychain window asking to allow Secretary (it may be behind other windows or on another desktop), enter your Mac password and click Always Allow, then reopen Secretary.".into())
+    })
+}
+
 /// Last lines of the server log, included in startup errors so problems are diagnosable.
 fn log_tail(log: &Path, lines: usize) -> String {
     let text = std::fs::read_to_string(log).unwrap_or_default();
@@ -91,6 +104,9 @@ pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, extra_en
     let url = format!("http://127.0.0.1:{port}");
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     let db = data_dir.join("db");
+    let _ = writeln!(log, "reading the encryption key from the system keychain");
+    let key = master_key_with_timeout(store)?;
+    let _ = writeln!(log, "encryption key ready");
     let mut cmd = Command::new(node_bin);
     for (key, value) in BUILT_IN_OAUTH {
         if let Some(v) = value.filter(|v| !v.is_empty()) {
@@ -123,7 +139,7 @@ pub fn start(node_bin: PathBuf, server_dir: PathBuf, data_dir: PathBuf, extra_en
         .env("WEB_ORIGINS", "tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:5173")
         .env("DATABASE_URL", format!("pglite://{}", db.display()))
         .env("MIGRATIONS_DIR", server_dir.join("migrations"))
-        .env("MASTER_KEY", master_key(store)?)
+        .env("MASTER_KEY", &key)
         .env("LOG_LEVEL", "warn")
         .stdout(Stdio::piped())
         .stderr(Stdio::from(log.try_clone().map_err(|e| e.to_string())?))
