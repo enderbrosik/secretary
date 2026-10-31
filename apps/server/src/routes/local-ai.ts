@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { AI_ERROR_MESSAGES, AIError, OllamaProvider, RECOMMENDED_LOCAL_MODELS } from '@secretary/ai';
+import { AI_ERROR_MESSAGES, AIError, OllamaProvider, RECOMMENDED_LOCAL_MODELS, SLOW_LOCAL_MODELS } from '@secretary/ai';
 import { schema } from '@secretary/db';
 import type { Deps } from '../lib/context.js';
 import { requireUser } from '../lib/auth.js';
@@ -26,13 +26,17 @@ export async function localAIRoutes(app: FastifyInstance, deps: Deps) {
     const version = await o.version();
     const installed = version ? await o.installedModels().catch(() => []) : [];
     const [row] = await deps.db.select().from(schema.aiProviders).where(and(eq(schema.aiProviders.userId, user.id), eq(schema.aiProviders.provider, 'ollama')));
+    const inUse = row?.active ? row.model : null;
+    // Offer the faster model when the one in use always "thinks" first.
+    const slowBytes = inUse && SLOW_LOCAL_MODELS[inUse] ? (installed.find((m) => m.name === inUse)?.sizeBytes ?? 0) : null;
     return {
       running: !!version,
       version,
       downloadUrl: 'https://ollama.com/download',
       installed: installed.map((m) => ({ name: m.name, diskGB: Math.round((m.sizeBytes / 1e9) * 10) / 10 })),
       recommended: RECOMMENDED_LOCAL_MODELS,
-      inUse: row?.active ? row.model : null,
+      inUse,
+      upgrade: inUse && slowBytes !== null ? { from: inUse, to: SLOW_LOCAL_MODELS[inUse]!, freesGB: Math.round((slowBytes / 1e9) * 10) / 10 } : null,
     };
   });
 

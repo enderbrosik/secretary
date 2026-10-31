@@ -13,6 +13,8 @@ interface Status {
   installed: { name: string; diskGB: number }[];
   recommended: { id: string; name: string; diskGB: number; minRamGB: number; note: string }[];
   inUse: string | null;
+  /** The model in use always "thinks" first; a faster one is available. */
+  upgrade: { from: string; to: string; freesGB: number } | null;
 }
 
 /** Free, private AI on this computer through the Ollama app: no account, no key, no cost. */
@@ -26,7 +28,8 @@ export function LocalAISetup({ onConnected }: { onConnected?: () => void }) {
     await Promise.all([qc.invalidateQueries({ queryKey: ['local-ai'] }), qc.invalidateQueries({ queryKey: ['ai-providers'] }), qc.invalidateQueries({ queryKey: ['me'] })]);
   };
 
-  const download = async (id: string) => {
+  /** Returns true when the model was downloaded and switched to. */
+  const download = async (id: string): Promise<boolean> => {
     setProgress((p) => ({ ...p, [id]: 0 }));
     try {
       let failed: string | null = null;
@@ -35,9 +38,10 @@ export function LocalAISetup({ onConnected }: { onConnected?: () => void }) {
         else if (typeof e.fraction === 'number') setProgress((p) => ({ ...p, [id]: e.fraction! }));
       });
       if (failed) throw new Error(failed);
-      await use(id);
+      return await use(id);
     } catch (e) {
       toast.error(errorMessage(e));
+      return false;
     } finally {
       setProgress((p) => {
         const n = { ...p };
@@ -48,18 +52,29 @@ export function LocalAISetup({ onConnected }: { onConnected?: () => void }) {
     }
   };
 
-  const use = async (id: string) => {
+  const use = async (id: string): Promise<boolean> => {
     setBusy(id);
     try {
       await api('/api/ai/local/use', { method: 'POST', body: { model: id } });
       toast.success('Local AI is on — free and private');
       await refresh();
       onConnected?.();
+      return true;
     } catch (e) {
       toast.error(errorMessage(e));
+      return false;
     } finally {
       setBusy(null);
     }
+  };
+
+  /** Download the faster model, switch to it, then delete the slow one so disk use doesn't grow. */
+  const upgrade = async (u: NonNullable<Status['upgrade']>) => {
+    const ok = installedNames.has(u.to) ? await use(u.to) : await download(u.to);
+    if (!ok) return;
+    await api(`/api/ai/local/models/${encodeURIComponent(u.from)}`, { method: 'DELETE' }).catch(() => undefined);
+    toast.success(u.freesGB ? `Switched to the faster model and freed ${u.freesGB} GB` : 'Switched to the faster model');
+    await refresh();
   };
 
   const remove = async (name: string, gb: number) => {
@@ -73,6 +88,7 @@ export function LocalAISetup({ onConnected }: { onConnected?: () => void }) {
     }
   };
 
+  const installedNames = new Set(st.data?.installed.map((m) => m.name));
   if (st.isLoading) return <Spinner />;
   const s = st.data;
   if (!s) return null;
@@ -116,6 +132,22 @@ export function LocalAISetup({ onConnected }: { onConnected?: () => void }) {
       <p className="flex items-center gap-2 text-[12.5px] text-ok">
         <Check className="size-3.5" /> Ollama {s.version} is running.
       </p>
+      {s.upgrade && (
+        <Banner
+          tone="warn"
+          title="Your local AI thinks for a long time before answering"
+          action={
+            <Button size="sm" variant="primary" loading={s.upgrade.to in progress || busy === s.upgrade.to} onClick={() => void upgrade(s.upgrade!)}>
+              Switch to the fast version
+            </Button>
+          }
+        >
+          {s.upgrade.from} is the “thinking” edition. The fast edition answers right away.{' '}
+          {installedNames.has(s.upgrade.to) ? 'It’s already downloaded.' : 'It’s a 2.5 GB download'}
+          {s.upgrade.freesGB ? `, and the old one is deleted afterwards (frees ${s.upgrade.freesGB} GB).` : '.'}
+          {s.upgrade.to in progress && <span className="mt-1 block tabular">Downloading… {Math.round((progress[s.upgrade.to] ?? 0) * 100)}%</span>}
+        </Banner>
+      )}
       {s.recommended.map((m) => {
         const have = installed.has(m.id);
         const p = progress[m.id];

@@ -11,9 +11,18 @@ export const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 
 /** Curated models offered in the UI, sized for typical laptops/desktops. */
 export const RECOMMENDED_LOCAL_MODELS = [
-  { id: 'qwen3:4b', name: 'Qwen3 4B', diskGB: 2.5, minRamGB: 8, note: 'Lightest. Good for summaries and email triage.' },
+  { id: 'qwen3:4b-instruct', name: 'Qwen3 4B', diskGB: 2.5, minRamGB: 8, note: 'Fast and light. Answers right away, with no long “thinking”.' },
   { id: 'qwen3:8b', name: 'Qwen3 8B', diskGB: 5.2, minRamGB: 16, note: 'Smarter prioritization, meeting prep and chat.' },
 ] as const;
+
+/**
+ * Models that always "think" before answering, whatever the request says. Ollama's plain
+ * `qwen3:4b` tag is the thinking-only 2507 release, so it's replaced by the instruct one.
+ */
+export const SLOW_LOCAL_MODELS: Record<string, string> = {
+  'qwen3:4b': 'qwen3:4b-instruct',
+  'qwen3:4b-thinking': 'qwen3:4b-instruct',
+};
 
 const CONTEXT_TOKENS = 16_384;
 

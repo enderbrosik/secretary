@@ -8,7 +8,7 @@ export * from './schema.js';
 export * from './pricing.js';
 export * from './defaults.js';
 export { AnthropicProvider, OllamaProvider, OpenAIProvider };
-export { DEFAULT_OLLAMA_URL, RECOMMENDED_LOCAL_MODELS, type OllamaModel } from './ollama.js';
+export { DEFAULT_OLLAMA_URL, RECOMMENDED_LOCAL_MODELS, SLOW_LOCAL_MODELS, type OllamaModel } from './ollama.js';
 
 export interface ProviderConfig {
   provider: ProviderId;

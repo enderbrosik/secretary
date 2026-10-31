@@ -13,22 +13,22 @@ const ndjson = (lines: object[]) => new HttpResponse(lines.map((l) => JSON.strin
 
 describe('Ollama (local AI)', () => {
   it('lists installed models with sizes and treats them as free', async () => {
-    server.use(http.get(`${B}/api/tags`, () => HttpResponse.json({ models: [{ name: 'qwen3:4b', size: 2_600_000_000, modified_at: '2026-10-01T00:00:00Z' }] })));
+    server.use(http.get(`${B}/api/tags`, () => HttpResponse.json({ models: [{ name: 'qwen3:4b-instruct', size: 2_600_000_000, modified_at: '2026-10-01T00:00:00Z' }] })));
     const p = new OllamaProvider();
-    expect((await p.installedModels())[0]).toMatchObject({ name: 'qwen3:4b', sizeBytes: 2_600_000_000 });
+    expect((await p.installedModels())[0]).toMatchObject({ name: 'qwen3:4b-instruct', sizeBytes: 2_600_000_000 });
     const models = await p.listModels();
-    expect(pickDefaultModel('ollama', models)).toBe('qwen3:4b');
-    expect(estimateCostUsd('ollama', 'qwen3:4b', { inputTokens: 9999, outputTokens: 9999 })).toBe(0);
+    expect(pickDefaultModel('ollama', models)).toBe('qwen3:4b-instruct');
+    expect(estimateCostUsd('ollama', 'qwen3:4b-instruct', { inputTokens: 9999, outputTokens: 9999 })).toBe(0);
   });
 
   it('sends a JSON schema, a large context window and no thinking; validates the output', async () => {
     let body: any;
     server.use(http.post(`${B}/api/chat`, async ({ request }) => {
       body = await request.json();
-      return HttpResponse.json({ model: 'qwen3:4b', message: { content: '<think>{not json}</think>{"summary":"ok","n":2}' }, prompt_eval_count: 900, eval_count: 40, done_reason: 'stop' });
+      return HttpResponse.json({ model: 'qwen3:4b-instruct', message: { content: '<think>{not json}</think>{"summary":"ok","n":2}' }, prompt_eval_count: 900, eval_count: 40, done_reason: 'stop' });
     }));
     const p = createProvider({ provider: 'ollama', apiKey: '' });
-    const r = await p.generateJSON({ model: 'qwen3:4b', system: 's', user: 'u', schema: z.object({ summary: z.string(), n: z.number() }), schemaName: 'x' });
+    const r = await p.generateJSON({ model: 'qwen3:4b-instruct', system: 's', user: 'u', schema: z.object({ summary: z.string(), n: z.number() }), schemaName: 'x' });
     expect(r.data).toEqual({ summary: 'ok', n: 2 });
     expect(r.usage).toEqual({ inputTokens: 900, outputTokens: 40 });
     expect(body.format.type).toBe('object');
@@ -61,11 +61,11 @@ describe('Ollama (local AI)', () => {
     );
     const p = new OllamaProvider();
     const deltas: string[] = [];
-    const r = await p.streamChat({ model: 'qwen3:4b', system: 's', messages: [{ role: 'user', content: 'hi' }], onText: (d) => deltas.push(d) });
+    const r = await p.streamChat({ model: 'qwen3:4b-instruct', system: 's', messages: [{ role: 'user', content: 'hi' }], onText: (d) => deltas.push(d) });
     expect(r.text).toBe('Hello');
     expect(r.usage).toEqual({ inputTokens: 5, outputTokens: 2 });
     const progress: (number | null)[] = [];
-    await p.pull('qwen3:4b', (x) => progress.push(x.fraction));
+    await p.pull('qwen3:4b-instruct', (x) => progress.push(x.fraction));
     expect(progress).toEqual([null, 0.5, 1]);
   });
 });
