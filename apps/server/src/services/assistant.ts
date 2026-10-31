@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { AI_ERROR_MESSAGES, AIError } from '@secretary/ai';
 import {
@@ -81,8 +81,9 @@ export async function streamAssistant(
     .select()
     .from(schema.chatMessages)
     .where(and(eq(schema.chatMessages.userId, user.id), eq(schema.chatMessages.threadId, threadId)))
-    .orderBy(asc(schema.chatMessages.createdAt))
-    .limit(20);
+    .orderBy(desc(schema.chatMessages.createdAt))
+    .limit(20)
+    .then((rows) => rows.reverse()); // the 20 most recent messages, oldest first
   await deps.db.insert(schema.chatMessages).values({ userId: user.id, threadId, role: 'user', content: input.message.slice(0, 8000) });
 
   // Retrieval: today's deterministic context + full-text matches for the question.
@@ -95,7 +96,28 @@ export async function streamAssistant(
   const openTasks = ws.tasks.filter((t) => t.status !== 'done' && t.status !== 'canceled');
   const ranked = ctx.ranking.slice(0, 15).map((r) => openTasks.find((t) => t.id === r.taskId)!).filter(Boolean);
   const tasks = uniq([...ranked, ...openTasks.filter((t) => t.status === 'waiting'), ...ws.tasks.filter((t) => t.status === 'done').slice(0, 10)]);
-  const refs = buildRefRegistry({ events, emails, messages, tasks });
+
+  // Refs the user has already seen in this conversation keep their number, so "tell me more
+  // about [E3]" always means the same record. Those records are brought back into context
+  // even when the new question wouldn't retrieve them.
+  const seen = new Map<string, SourceRef>();
+  for (const h of history) if (h.role === 'assistant') for (const c of (h.citations as SourceRef[] | null) ?? []) seen.set(c.ref, c);
+  const pinnedIds = new Map([...seen.values()].map((c) => [c.id, c.ref]));
+  const haveIds = new Set([...events, ...emails, ...messages, ...tasks].map((x) => x.id));
+  const missingItemIds = [...seen.values()].filter((c) => c.kind !== 'task' && !haveIds.has(c.id)).map((c) => c.id);
+  if (missingItemIds.length) {
+    const rows = await deps.db.select().from(schema.items).where(and(eq(schema.items.userId, user.id), inArray(schema.items.id, missingItemIds)));
+    for (const it of rows.map(toItem)) {
+      if (it.kind === 'event') events.push(it as EventItem);
+      else if (it.kind === 'email') emails.push(it as EmailItem);
+      else if (it.kind === 'message') messages.push(it as MessageItem);
+    }
+  }
+  for (const c of seen.values()) {
+    const t = c.kind === 'task' && !haveIds.has(c.id) ? ws.tasks.find((x) => x.id === c.id) : undefined;
+    if (t) tasks.push(t);
+  }
+  const refs = buildRefRegistry({ events, emails, messages, tasks }, [...pinnedIds].map(([id, ref]) => ({ id, ref })));
 
   const connected = ws.freshness.map((f) => `${f.label}${f.stale ? ' (may be out of date)' : ''}`);
   const records = [
@@ -117,6 +139,8 @@ export async function streamAssistant(
       'How to answer:',
       '- Answer from the RECORDS and FACTS below only. Cite every record you rely on inline with its ref in square brackets, e.g. [E2] or [T1].',
       `- Connected sources: ${connected.join('; ') || 'none'}. If the user asks about something not covered by these records or sources, say you don't have access to it rather than guessing.`,
+      '- Refs stay the same for this whole conversation. When the user mentions a ref such as [E3], answer about exactly that record from RECORDS; if it is not listed, say you cannot find it instead of choosing another.',
+      '- The records have no read/unread flag, no work/personal label and no processing status. Never claim any of these; say plainly that you cannot tell.',
       '- Distinguish facts from your suggestions. Never invent meetings, deadlines, people or commitments.',
       '- You cannot send, post, schedule or change anything. When asked to draft a reply, write the draft; the user can save or send it from the Inbox after reviewing it.',
       '- Unconfirmed AI-suggested tasks are only suggestions; say so if you mention them.',

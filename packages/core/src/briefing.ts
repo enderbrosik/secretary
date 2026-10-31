@@ -74,30 +74,49 @@ export interface BriefingContext {
   suspicious: Set<string>;
 }
 
-export function buildRefRegistry(input: {
-  emails: EmailItem[];
-  events: EventItem[];
-  messages: MessageItem[];
-  tasks: Task[];
-}): RefRegistry {
+export function buildRefRegistry(
+  input: {
+    emails: EmailItem[];
+    events: EventItem[];
+    messages: MessageItem[];
+    tasks: Task[];
+  },
+  /**
+   * Refs already shown to the user earlier in a conversation. A record keeps its ref, and the
+   * number is never reused for a different record, so "tell me more about [E3]" stays correct.
+   */
+  pinned: { ref: string; id: string }[] = [],
+): RefRegistry {
   const byRef = new Map<string, SourceRef>();
   const byId = new Map<string, SourceRef>();
+  const pinnedById = new Map(pinned.map((p) => [p.id, p.ref]));
+  const reserved = new Set(pinned.map((p) => p.ref));
   const add = (r: SourceRef) => {
     byRef.set(r.ref, r);
     byId.set(r.id, r);
   };
-  input.events.forEach((e, i) =>
-    add({ ref: `C${i + 1}`, kind: 'event', id: e.id, title: e.title, url: e.url, source: e.source }),
-  );
-  input.emails.forEach((e, i) =>
-    add({ ref: `E${i + 1}`, kind: 'email', id: e.id, title: e.title, url: e.url, source: e.source }),
-  );
-  input.messages.forEach((m, i) =>
-    add({ ref: `M${i + 1}`, kind: 'message', id: m.id, title: m.title, url: m.url, source: m.source }),
-  );
-  input.tasks.forEach((t, i) =>
-    add({ ref: `T${i + 1}`, kind: 'task', id: t.id, title: t.title, url: t.sourceUrl, source: t.source }),
-  );
+  const assign = <T extends { id: string; title: string }>(
+    prefix: string,
+    kind: SourceRef['kind'],
+    xs: T[],
+    meta: (x: T) => { url: string | null; source: SourceRef['source'] },
+  ) => {
+    let n = 0;
+    const next = () => {
+      do n++;
+      while (reserved.has(`${prefix}${n}`));
+      return `${prefix}${n}`;
+    };
+    for (const x of xs) {
+      const ref = pinnedById.get(x.id) ?? next();
+      reserved.add(ref);
+      add({ ref, kind, id: x.id, title: x.title, ...meta(x) });
+    }
+  };
+  assign('C', 'event', input.events, (e) => ({ url: e.url, source: e.source }));
+  assign('E', 'email', input.emails, (e) => ({ url: e.url, source: e.source }));
+  assign('M', 'message', input.messages, (m) => ({ url: m.url, source: m.source }));
+  assign('T', 'task', input.tasks, (t) => ({ url: t.sourceUrl, source: t.source }));
   return { byRef, byId };
 }
 

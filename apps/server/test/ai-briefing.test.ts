@@ -162,4 +162,27 @@ describe('morning briefing', () => {
     expect(done.type).toBe('done');
     expect(done.citations.map((c: { ref: string }) => c.ref).sort()).toEqual(['E1', 'T1']);
   });
+
+  it('assistant keeps source numbers stable within a conversation', async () => {
+    const chat = async (message: string, threadId?: string) => {
+      const r = await t.app.inject({ method: 'POST', url: '/api/assistant/chat', headers: s.headers, payload: { message, threadId } });
+      const events = r.body.trim().split('\n').map((l) => JSON.parse(l));
+      return { threadId: events[0].threadId as string, done: events.at(-1) as { citations: { ref: string; id: string; title: string }[] } };
+    };
+    fake.behavior = { chat: 'Summary: [E1] [E2] [E3].' };
+    const first = await chat('Summarize my emails');
+    const e3 = first.done.citations.find((c) => c.ref === 'E3')!;
+    expect(e3).toBeTruthy();
+    // A new email syncs in between and outranks the others, which renumbers everything before the fix.
+    const [top] = (await t.deps.db.select().from(schema.items)).filter((i) => i.kind === 'email' && i.id === first.done.citations.find((c) => c.ref === 'E1')!.id);
+    await t.deps.db.insert(schema.items).values({ ...top!, id: crypto.randomUUID(), externalId: `${top!.externalId}-new`, title: 'Brand new email', occurredAt: new Date(t.clock.now.getTime() + 60_000).toISOString() });
+    fake.behavior = { chat: 'More on [E3].' };
+    const second = await chat('tell me more about E3', first.threadId);
+    expect(second.done.citations.find((c) => c.ref === 'E3')).toMatchObject({ id: e3.id, title: e3.title });
+    const system = fake.calls.at(-1)!.system;
+    expect(system.split('\n').find((l) => l.startsWith('[E3] EMAIL'))! + system).toContain(e3.title);
+    // Each ref is used once.
+    const refsInPrompt = [...system.matchAll(/^\[(E\d+)\] EMAIL/gm)].map((m) => m[1]);
+    expect(new Set(refsInPrompt).size).toBe(refsInPrompt.length);
+  });
 });
