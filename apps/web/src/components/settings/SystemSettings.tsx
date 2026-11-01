@@ -162,7 +162,7 @@ export function PrivacySettings() {
       <Card>
         <CardHeader
           title="Privacy Policy & Terms"
-          subtitle="How Secretary handles your data, and the terms for using it."
+          subtitle="How Secretary handles your data, and the terms for using it. Questions: help@secretary.pocketlantern.app"
           actions={
             <div className="flex gap-2">
               <Button size="sm" onClick={() => nav('/privacy')}>

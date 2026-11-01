@@ -46,7 +46,7 @@ const BUILT_IN_OAUTH: [(&str, Option<&str>); 8] = [
 ];
 
 /// HTTPS page that forwards Slack/Todoist sign-in redirects to the local server.
-const DEFAULT_OAUTH_RELAY: &str = "https://getsecretary.vercel.app/oauth/";
+const DEFAULT_OAUTH_RELAY: &str = "https://secretary.pocketlantern.app/oauth/";
 
 fn free_port() -> std::io::Result<u16> {
     if TcpListener::bind(("127.0.0.1", PREFERRED_PORT)).is_ok() {

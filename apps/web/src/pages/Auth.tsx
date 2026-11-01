@@ -62,6 +62,10 @@ export function AuthPage({ mode, serverError }: { mode: 'login' | 'signup'; serv
           <Link to="/terms" className="underline-offset-2 hover:text-ink hover:underline">
             Terms
           </Link>
+          {' · '}
+          <a href="mailto:help@secretary.pocketlantern.app" className="underline-offset-2 hover:text-ink hover:underline">
+            Help
+          </a>
         </p>
       </div>
       <div className="flex items-center justify-center p-6">

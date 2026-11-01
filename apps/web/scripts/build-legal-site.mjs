@@ -46,7 +46,7 @@ const page = ({ title, description, body }) => `<!doctype html>
 <body>
 <main>
 ${body}
-<footer><a href="${base}/privacy/">Privacy Policy</a> · <a href="${base}/terms/">Terms of Service</a> · <a href="${REPO_URL}">Source code</a></footer>
+<footer><a href="${base}/privacy/">Privacy Policy</a> · <a href="${base}/terms/">Terms of Service</a> · <a href="mailto:help@secretary.pocketlantern.app">Help</a> · <a href="${REPO_URL}">Source code</a></footer>
 </main>
 </body>
 </html>
